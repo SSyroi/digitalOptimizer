@@ -128,10 +128,14 @@ module clock_divider_rst_va (clk, rst_n, load, div_ratio, clk_out, count);
 
   // Internal State & Combinational Signals
   real clk_out_q, clk_out_d;
-  real cnt_reg_3_q, cnt_reg_3_d;
-  real cnt_reg_2_q, cnt_reg_2_d;
-  real cnt_reg_1_q, cnt_reg_1_d;
   real cnt_reg_0_q, cnt_reg_0_d;
+  real cnt_reg_1_q, cnt_reg_1_d;
+  real cnt_reg_2_q, cnt_reg_2_d;
+  real cnt_reg_3_q, cnt_reg_3_d;
+  real count_0_val;
+  real count_1_val;
+  real count_2_val;
+  real count_3_val;
 
   analog begin
     @(initial_step("static", "ac")) begin
@@ -152,22 +156,21 @@ module clock_divider_rst_va (clk, rst_n, load, div_ratio, clk_out, count);
     end
 
     // Multi-Level Combinational Logic Evaluations
-    clk_out = clk_out_q;
-    clk_out_d = MUX2(clk_out_q, MUX2(V(load), MUX2(cnt_reg[3], NOR3(cnt_reg[2], cnt_reg[1], cnt_reg[0]), 0.0), 0.0), MUX2(V(load), MUX2(cnt_reg[3], OR3(cnt_reg[2], cnt_reg[1], cnt_reg[0]), 1.0), 0.0));
-    cnt_reg_0_d = OR2(OR2(OR2(OR2(AND2(V(load), div_ratio[0]), AND3(INV(V(load)), cnt_reg[2], INV(cnt_reg[0]))), AND2(div_ratio[0], INV(cnt_reg[0]))), AND3(INV(V(load)), cnt_reg[3], INV(cnt_reg[0]))), AND3(INV(V(load)), cnt_reg[1], INV(cnt_reg[0])));
-    cnt_reg_1_d = OR2(OR2(OR2(AND3(INV(V(load)), INV(cnt_reg[1]), cnt_reg[0]), AND2(V(load), div_ratio[1])), AND3(INV(V(load)), cnt_reg[1], INV(cnt_reg[0]))), AND4(div_ratio[1], INV(cnt_reg[3]), INV(cnt_reg[2]), INV(cnt_reg[0])));
-    cnt_reg_2_d = OR2(OR2(OR2(OR2(AND2(V(load), div_ratio[2]), AND3(INV(V(load)), cnt_reg[2], INV(cnt_reg[1]))), AND4(INV(V(load)), INV(cnt_reg[2]), cnt_reg[1], cnt_reg[0])), AND3(INV(V(load)), cnt_reg[2], INV(cnt_reg[0]))), AND4(div_ratio[2], INV(cnt_reg[3]), INV(cnt_reg[1]), INV(cnt_reg[0])));
-    cnt_reg_3_d = OR2(OR2(OR2(OR2(OR2(AND3(INV(V(load)), cnt_reg[3], INV(cnt_reg[2])), AND2(V(load), div_ratio[3])), AND3(INV(V(load)), cnt_reg[3], INV(cnt_reg[1]))), AND2(AND2(AND2(AND2(INV(V(load)), INV(cnt_reg[3])), cnt_reg[2]), cnt_reg[1]), cnt_reg[0])), AND3(INV(V(load)), cnt_reg[3], INV(cnt_reg[0]))), AND4(div_ratio[3], INV(cnt_reg[2]), INV(cnt_reg[1]), INV(cnt_reg[0])));
-    count_0 = cnt_reg[0];
-    count_1 = cnt_reg[1];
-    count_2 = cnt_reg[2];
-    count_3 = cnt_reg[3];
+    clk_out_d = MUX2(clk_out_q, MUX2(V(load), MUX2(cnt_reg_3_q, NOR3(cnt_reg_2_q, cnt_reg_1_q, cnt_reg_0_q), 0.0), 0.0), MUX2(V(load), MUX2(cnt_reg_3_q, OR3(cnt_reg_2_q, cnt_reg_1_q, cnt_reg_0_q), 1.0), 0.0));
+    cnt_reg_0_d = OR2(OR2(OR2(OR2(AND3(INV(V(load)), cnt_reg_3_q, INV(cnt_reg_0_q)), AND2(V(load), V(div_ratio[0]))), AND2(V(div_ratio[0]), INV(cnt_reg_0_q))), AND3(INV(V(load)), cnt_reg_1_q, INV(cnt_reg_0_q))), AND3(INV(V(load)), cnt_reg_2_q, INV(cnt_reg_0_q)));
+    cnt_reg_1_d = OR2(OR2(OR2(AND3(INV(V(load)), cnt_reg_1_q, INV(cnt_reg_0_q)), AND3(INV(V(load)), INV(cnt_reg_1_q), cnt_reg_0_q)), AND2(V(load), V(div_ratio[1]))), AND4(V(div_ratio[1]), INV(cnt_reg_3_q), INV(cnt_reg_2_q), INV(cnt_reg_0_q)));
+    cnt_reg_2_d = OR2(OR2(OR2(OR2(AND4(INV(V(load)), INV(cnt_reg_2_q), cnt_reg_1_q, cnt_reg_0_q), AND3(INV(V(load)), cnt_reg_2_q, INV(cnt_reg_1_q))), AND2(V(load), V(div_ratio[2]))), AND4(V(div_ratio[2]), INV(cnt_reg_3_q), INV(cnt_reg_1_q), INV(cnt_reg_0_q))), AND3(INV(V(load)), cnt_reg_2_q, INV(cnt_reg_0_q)));
+    cnt_reg_3_d = OR2(OR2(OR2(OR2(OR2(AND3(INV(V(load)), cnt_reg_3_q, INV(cnt_reg_1_q)), AND3(INV(V(load)), cnt_reg_3_q, INV(cnt_reg_2_q))), AND4(V(div_ratio[3]), INV(cnt_reg_2_q), INV(cnt_reg_1_q), INV(cnt_reg_0_q))), AND3(INV(V(load)), cnt_reg_3_q, INV(cnt_reg_0_q))), AND2(AND2(AND2(AND2(INV(V(load)), INV(cnt_reg_3_q)), cnt_reg_2_q), cnt_reg_1_q), cnt_reg_0_q)), AND2(V(load), V(div_ratio[3])));
+    count_0_val = cnt_reg_0_q;
+    count_1_val = cnt_reg_1_q;
+    count_2_val = cnt_reg_2_q;
+    count_3_val = cnt_reg_3_q;
 
     // Analog Electrical Output Drivers
     V(clk_out) <+ transition((clk_out_q > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(count[3]) <+ transition((count_3 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(count[2]) <+ transition((count_2 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(count[1]) <+ transition((count_1 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(count[0]) <+ transition((count_0 > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(count[3]) <+ transition((count_3_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(count[2]) <+ transition((count_2_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(count[1]) <+ transition((count_1_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(count[0]) <+ transition((count_0_val > vth) ? vhigh : vlow, tdel, trise, tfall);
   end
 endmodule

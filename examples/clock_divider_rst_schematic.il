@@ -33,13 +33,13 @@ procedure( create_clock_divider_rst_schematic(libName cellName)
     y = y + yStep
     ;; Node: clk_out_d = MUX2(clk_out, MUX2(load, MUX2(cnt_reg[3], NOR3(cnt_reg[2], cnt_reg[1], cnt_reg[0]), 0.0), 0.0), MUX2(load, MUX2(cnt_reg[3], OR3(cnt_reg[2], cnt_reg[1], cnt_reg[0]), 1.0), 0.0))
     y = y + yStep
-    ;; Node: cnt_reg[0]_d = OR2(OR2(OR2(OR2(AND2(load, div_ratio[0]), AND3(INV(load), cnt_reg[2], INV(cnt_reg[0]))), AND2(div_ratio[0], INV(cnt_reg[0]))), AND3(INV(load), cnt_reg[3], INV(cnt_reg[0]))), AND3(INV(load), cnt_reg[1], INV(cnt_reg[0])))
+    ;; Node: cnt_reg[0]_d = OR2(OR2(OR2(OR2(AND3(INV(load), cnt_reg[3], INV(cnt_reg[0])), AND2(load, div_ratio[0])), AND2(div_ratio[0], INV(cnt_reg[0]))), AND3(INV(load), cnt_reg[1], INV(cnt_reg[0]))), AND3(INV(load), cnt_reg[2], INV(cnt_reg[0])))
     y = y + yStep
-    ;; Node: cnt_reg[1]_d = OR2(OR2(OR2(AND3(INV(load), INV(cnt_reg[1]), cnt_reg[0]), AND2(load, div_ratio[1])), AND3(INV(load), cnt_reg[1], INV(cnt_reg[0]))), AND4(div_ratio[1], INV(cnt_reg[3]), INV(cnt_reg[2]), INV(cnt_reg[0])))
+    ;; Node: cnt_reg[1]_d = OR2(OR2(OR2(AND3(INV(load), cnt_reg[1], INV(cnt_reg[0])), AND3(INV(load), INV(cnt_reg[1]), cnt_reg[0])), AND2(load, div_ratio[1])), AND4(div_ratio[1], INV(cnt_reg[3]), INV(cnt_reg[2]), INV(cnt_reg[0])))
     y = y + yStep
-    ;; Node: cnt_reg[2]_d = OR2(OR2(OR2(OR2(AND2(load, div_ratio[2]), AND3(INV(load), cnt_reg[2], INV(cnt_reg[1]))), AND4(INV(load), INV(cnt_reg[2]), cnt_reg[1], cnt_reg[0])), AND3(INV(load), cnt_reg[2], INV(cnt_reg[0]))), AND4(div_ratio[2], INV(cnt_reg[3]), INV(cnt_reg[1]), INV(cnt_reg[0])))
+    ;; Node: cnt_reg[2]_d = OR2(OR2(OR2(OR2(AND4(INV(load), INV(cnt_reg[2]), cnt_reg[1], cnt_reg[0]), AND3(INV(load), cnt_reg[2], INV(cnt_reg[1]))), AND2(load, div_ratio[2])), AND4(div_ratio[2], INV(cnt_reg[3]), INV(cnt_reg[1]), INV(cnt_reg[0]))), AND3(INV(load), cnt_reg[2], INV(cnt_reg[0])))
     y = y + yStep
-    ;; Node: cnt_reg[3]_d = OR2(OR2(OR2(OR2(OR2(AND3(INV(load), cnt_reg[3], INV(cnt_reg[2])), AND2(load, div_ratio[3])), AND3(INV(load), cnt_reg[3], INV(cnt_reg[1]))), AND2(AND2(AND2(AND2(INV(load), INV(cnt_reg[3])), cnt_reg[2]), cnt_reg[1]), cnt_reg[0])), AND3(INV(load), cnt_reg[3], INV(cnt_reg[0]))), AND4(div_ratio[3], INV(cnt_reg[2]), INV(cnt_reg[1]), INV(cnt_reg[0])))
+    ;; Node: cnt_reg[3]_d = OR2(OR2(OR2(OR2(OR2(AND3(INV(load), cnt_reg[3], INV(cnt_reg[1])), AND3(INV(load), cnt_reg[3], INV(cnt_reg[2]))), AND4(div_ratio[3], INV(cnt_reg[2]), INV(cnt_reg[1]), INV(cnt_reg[0]))), AND3(INV(load), cnt_reg[3], INV(cnt_reg[0]))), AND2(AND2(AND2(AND2(INV(load), INV(cnt_reg[3])), cnt_reg[2]), cnt_reg[1]), cnt_reg[0])), AND2(load, div_ratio[3]))
     y = y + yStep
     ;; Node: count[0] = cnt_reg[0]
     y = y + yStep

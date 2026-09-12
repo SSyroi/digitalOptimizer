@@ -129,14 +129,20 @@ module sar_adc_ctrl_va (clk, rst_n, start, comp_out, dac_code, eoc, valid);
   endfunction
 
   // Internal State & Combinational Signals
-  real dac_reg_3_q, dac_reg_3_d;
-  real dac_reg_2_q, dac_reg_2_d;
-  real dac_reg_1_q, dac_reg_1_d;
   real dac_reg_0_q, dac_reg_0_d;
-  real state_2_q, state_2_d;
-  real state_1_q, state_1_d;
+  real dac_reg_1_q, dac_reg_1_d;
+  real dac_reg_2_q, dac_reg_2_d;
+  real dac_reg_3_q, dac_reg_3_d;
   real state_0_q, state_0_d;
+  real state_1_q, state_1_d;
+  real state_2_q, state_2_d;
   real eoc_reg_q, eoc_reg_d;
+  real dac_code_0_val;
+  real dac_code_1_val;
+  real dac_code_2_val;
+  real dac_code_3_val;
+  real eoc_val;
+  real valid_val;
 
   analog begin
     @(initial_step("static", "ac")) begin
@@ -163,27 +169,27 @@ module sar_adc_ctrl_va (clk, rst_n, start, comp_out, dac_code, eoc, valid);
     end
 
     // Multi-Level Combinational Logic Evaluations
-    dac_reg_0_d = MUX2(dac_reg[0], MUX2(state[2], 0.0, NOR2(state[1], state[0])), OR3(state[2], state[1], state[0]));
-    dac_reg_1_d = OR2(OR2(OR2(AND2(dac_reg[1], state[0]), AND3(INV(V(comp_out)), dac_reg[1], state[2])), AND2(dac_reg[1], state[1])), AND3(INV(state[2]), state[1], state[0]));
-    dac_reg_2_d = OR2(OR2(OR2(AND3(dac_reg[2], INV(state[1]), state[0]), AND3(INV(state[2]), state[1], INV(state[0]))), AND2(dac_reg[2], state[2])), AND3(INV(V(comp_out)), dac_reg[2], state[0]));
-    dac_reg_3_d = OR2(OR2(OR2(AND2(dac_reg[3], state[0]), AND3(INV(state[2]), INV(state[1]), state[0])), AND3(INV(V(comp_out)), dac_reg[3], state[1])), AND2(dac_reg[3], state[2]));
-    state_0_d = OR3(AND3(state[2], INV(state[1]), INV(state[0])), AND3(INV(state[2]), state[1], INV(state[0])), AND3(V(start), INV(state[1]), INV(state[0])));
-    state_1_d = MUX2(state[2], XOR2(state[1], state[0]), 0.0);
-    state_2_d = MUX2(state[2], AND2(state[1], state[0]), NOR2(state[1], state[0]));
-    eoc_reg_d = MUX2(state[2], 0.0, NOR2(state[1], state[0]));
-    dac_code_0 = dac_reg[0];
-    dac_code_1 = dac_reg[1];
-    dac_code_2 = dac_reg[2];
-    dac_code_3 = dac_reg[3];
-    eoc = eoc_reg_q;
-    valid = eoc_reg_q;
+    dac_reg_0_d = MUX2(dac_reg_0_q, MUX2(state_2_q, 0.0, NOR2(state_1_q, state_0_q)), OR3(state_2_q, state_1_q, state_0_q));
+    dac_reg_1_d = OR2(OR2(OR2(AND2(dac_reg_1_q, state_0_q), AND2(dac_reg_1_q, state_1_q)), AND3(INV(V(comp_out)), dac_reg_1_q, state_2_q)), AND3(INV(state_2_q), state_1_q, state_0_q));
+    dac_reg_2_d = OR2(OR2(OR2(AND2(dac_reg_2_q, state_2_q), AND3(INV(state_2_q), state_1_q, INV(state_0_q))), AND3(dac_reg_2_q, INV(state_1_q), state_0_q)), AND3(INV(V(comp_out)), dac_reg_2_q, state_0_q));
+    dac_reg_3_d = OR2(OR2(OR2(AND2(dac_reg_3_q, state_0_q), AND3(INV(state_2_q), INV(state_1_q), state_0_q)), AND3(INV(V(comp_out)), dac_reg_3_q, state_1_q)), AND2(dac_reg_3_q, state_2_q));
+    state_0_d = OR3(AND3(state_2_q, INV(state_1_q), INV(state_0_q)), AND3(INV(state_2_q), state_1_q, INV(state_0_q)), AND3(V(start), INV(state_1_q), INV(state_0_q)));
+    state_1_d = MUX2(state_2_q, XOR2(state_1_q, state_0_q), 0.0);
+    state_2_d = MUX2(state_2_q, AND2(state_1_q, state_0_q), NOR2(state_1_q, state_0_q));
+    eoc_reg_d = MUX2(state_2_q, 0.0, NOR2(state_1_q, state_0_q));
+    dac_code_0_val = dac_reg_0_q;
+    dac_code_1_val = dac_reg_1_q;
+    dac_code_2_val = dac_reg_2_q;
+    dac_code_3_val = dac_reg_3_q;
+    eoc_val = eoc_reg_q;
+    valid_val = eoc_reg_q;
 
     // Analog Electrical Output Drivers
-    V(dac_code[3]) <+ transition((dac_code_3 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(dac_code[2]) <+ transition((dac_code_2 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(dac_code[1]) <+ transition((dac_code_1 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(dac_code[0]) <+ transition((dac_code_0 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(eoc) <+ transition((eoc > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(valid) <+ transition((valid > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(dac_code[3]) <+ transition((dac_code_3_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(dac_code[2]) <+ transition((dac_code_2_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(dac_code[1]) <+ transition((dac_code_1_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(dac_code[0]) <+ transition((dac_code_0_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(eoc) <+ transition((eoc_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(valid) <+ transition((valid_val > vth) ? vhigh : vlow, tdel, trise, tfall);
   end
 endmodule

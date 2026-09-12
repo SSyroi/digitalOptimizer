@@ -103,15 +103,22 @@ class VerilogAEmitter:
         lines.append("  // Internal State & Combinational Signals")
         # Sequential register Q and D nets
         for r_name, r in self.dag.registers.items():
-            for b in r.bit_names:
-                b_var = b.replace("[", "_").replace("]", "")
+            for bit_i in range(r.width):
+                b_var = f"{r_name}_{bit_i}" if r.width > 1 else r_name
                 lines.append(f"  real {b_var}_q, {b_var}_d;")
 
-        # Intermediate nets
+        # Combinational logic nodes (intermediates and non-register outputs)
+        declared_vars: Set[str] = set()
         for node_name, node in self.dag.nodes.items():
-            if node.node_type == "intermediate":
-                n_var = node_name.replace("[", "_").replace("]", "")
-                lines.append(f"  real {n_var};")
+            if node.node_type == "register_d":
+                continue
+            base_name = node_name.split("[")[0]
+            if base_name in self.dag.registers:
+                continue
+            safe_var = node_name.replace("[", "_").replace("]", "") + "_val"
+            if safe_var not in declared_vars:
+                lines.append(f"  real {safe_var};")
+                declared_vars.add(safe_var)
 
         lines.append("")
 
@@ -145,24 +152,22 @@ class VerilogAEmitter:
 
         # Multi-Level Combinational Logic Evaluation (in topological order)
         lines.append("    // Multi-Level Combinational Logic Evaluations")
-        
-        # Intermediate nodes first
         for node_name in self.dag.topo_order:
             node = self.dag.nodes.get(node_name)
-            if node and node.node_type == "intermediate":
-                mapped = self.mapped_nodes.get(node_name)
-                expr_str = self._format_veriloga_expr(mapped.expression if mapped else "0.0")
-                n_var = node_name.replace("[", "_").replace("]", "")
-                lines.append(f"    {n_var} = {expr_str};")
+            if not node:
+                continue
+            mapped = self.mapped_nodes.get(node_name)
+            expr_str = self._format_veriloga_expr(mapped.expression if mapped else "0.0")
 
-        # Next-state D-inputs and outputs
-        for node_name in self.dag.topo_order:
-            node = self.dag.nodes.get(node_name)
-            if node and node.node_type != "intermediate":
-                mapped = self.mapped_nodes.get(node_name)
-                expr_str = self._format_veriloga_expr(mapped.expression if mapped else "0.0")
-                n_var = node_name.replace("[", "_").replace("]", "")
-                lines.append(f"    {n_var} = {expr_str};")
+            if node.node_type == "register_d":
+                d_var = node_name.replace("[", "_").replace("]", "")
+                lines.append(f"    {d_var} = {expr_str};")
+            else:
+                base_name = node_name.split("[")[0]
+                if base_name in self.dag.registers:
+                    continue  # Register outputs driven by _q
+                val_var = node_name.replace("[", "_").replace("]", "") + "_val"
+                lines.append(f"    {val_var} = {expr_str};")
 
         lines.append("")
 
@@ -176,7 +181,7 @@ class VerilogAEmitter:
                     if base_name in self.dag.registers:
                         driver_sig = f"{b_var}_q"
                     else:
-                        driver_sig = b_var
+                        driver_sig = f"{b_var}_val"
                     lines.append(f"    V({b_name}) <+ transition(({driver_sig} > vth) ? vhigh : vlow, tdel, trise, tfall);")
 
         lines.append("  end")
@@ -185,21 +190,31 @@ class VerilogAEmitter:
 
         return "\n".join(lines)
 
-    def _format_veriloga_expr(self, expr: str) -> str:
-        """Formats gate expressions with analog voltages V(pin) and _q variables."""
-        for p in self.dag.primary_inputs:
-            expr = re.sub(rf"\b{re.escape(p)}\b", f"V({p})", expr)
+    def _sub_signal(self, target_expr: str, sig_name: str, replacement: str) -> str:
+        pattern = rf"(?<![A-Za-z0-9_]){re.escape(sig_name)}(?![A-Za-z0-9_])"
+        return re.sub(pattern, replacement, target_expr)
 
+    def _format_veriloga_expr(self, expr: str) -> str:
+        """Formats gate expressions with analog voltages V(pin) and _q / _val variables."""
+        # 1. Replace primary inputs with V(pin)
+        for p in self.dag.primary_inputs:
+            expr = self._sub_signal(expr, p, f"V({p})")
+
+        # 2. Replace register references with their sampled state _q
         for r_name, r in self.dag.registers.items():
             for bit_i in range(r.width):
                 b_name = f"{r_name}[{bit_i}]" if r.width > 1 else r_name
                 b_var = f"{r_name}_{bit_i}_q" if r.width > 1 else f"{r_name}_q"
-                expr = re.sub(rf"\b{re.escape(b_name)}\b", b_var, expr)
+                expr = self._sub_signal(expr, b_name, b_var)
 
+        # 3. Replace intermediate and output node dependencies with their _val variable
         for n_name, n in self.dag.nodes.items():
-            if n.node_type == "intermediate":
-                n_var = n_name.replace("[", "_").replace("]", "")
-                expr = re.sub(rf"\b{re.escape(n_name)}\b", n_var, expr)
+            if n.node_type == "register_d":
+                continue
+            base_name = n_name.split("[")[0]
+            if base_name not in self.dag.registers:
+                n_var = n_name.replace("[", "_").replace("]", "") + "_val"
+                expr = self._sub_signal(expr, n_name, n_var)
 
         return expr
 

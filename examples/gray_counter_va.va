@@ -7,13 +7,16 @@
 // Cadence Spectre & Virtuoso Compatible Verilog-A Model
 //
 // Circuit Complexity & Silicon Area Notes:
-//   - Total Gate Count         : 5 cells
-//   - Inverter Equivalents (GE) : 32.0 inverters (1 GE = 1 Inverter = 2 Transistors)
-//   - Est. Transistor Count    : ~64 transistors
+//   - Total Gate Count         : 11 cells
+//   - Inverter Equivalents (GE) : 53.0 inverters (1 GE = 1 Inverter = 2 Transistors)
+//   - Est. Transistor Count    : ~106 transistors
 //
 // Standard Cell Breakdown (Gate Counts & Inverter Weights):
+//   - AND3    :   1 cells (  4.0 inverters eq.,    8 transistors)
 //   - DFFR    :   3 cells ( 24.0 inverters eq.,   48 transistors)
-//   - XOR2    :   2 cells (  8.0 inverters eq.,   16 transistors)
+//   - MUX2    :   2 cells (  6.0 inverters eq.,   12 transistors)
+//   - NAND3   :   1 cells (  3.0 inverters eq.,    6 transistors)
+//   - XOR2    :   4 cells ( 16.0 inverters eq.,   32 transistors)
 // ============================================================================
 
 module gray_counter_va (clk, rst_n, ena, count_bin, count_gray);
@@ -118,9 +121,15 @@ module gray_counter_va (clk, rst_n, ena, count_bin, count_gray);
   endfunction
 
   // Internal State & Combinational Signals
-  real q_2_q, q_2_d;
-  real q_1_q, q_1_d;
   real q_0_q, q_0_d;
+  real q_1_q, q_1_d;
+  real q_2_q, q_2_d;
+  real count_bin_0_val;
+  real count_bin_1_val;
+  real count_bin_2_val;
+  real count_gray_2_val;
+  real count_gray_1_val;
+  real count_gray_0_val;
 
   analog begin
     @(initial_step("static", "ac")) begin
@@ -137,22 +146,22 @@ module gray_counter_va (clk, rst_n, ena, count_bin, count_gray);
     end
 
     // Multi-Level Combinational Logic Evaluations
-    q_0_d = q[0];
-    q_1_d = q[1];
-    q_2_d = q[2];
-    count_bin_0 = q[0];
-    count_bin_1 = q[1];
-    count_bin_2 = q[2];
-    count_gray_2 = q[2];
-    count_gray_1 = XOR2(q[2], q[1]);
-    count_gray_0 = XOR2(q[1], q[0]);
+    q_0_d = XOR2(q_0_q, V(ena));
+    q_1_d = MUX2(q_0_q, q_1_q, XOR2(q_1_q, V(ena)));
+    q_2_d = MUX2(q_2_q, AND3(q_0_q, q_1_q, V(ena)), NAND3(q_0_q, q_1_q, V(ena)));
+    count_bin_0_val = q_0_q;
+    count_bin_1_val = q_1_q;
+    count_bin_2_val = q_2_q;
+    count_gray_2_val = q_2_q;
+    count_gray_1_val = XOR2(q_2_q, q_1_q);
+    count_gray_0_val = XOR2(q_1_q, q_0_q);
 
     // Analog Electrical Output Drivers
-    V(count_bin[2]) <+ transition((count_bin_2 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(count_bin[1]) <+ transition((count_bin_1 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(count_bin[0]) <+ transition((count_bin_0 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(count_gray[2]) <+ transition((count_gray_2 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(count_gray[1]) <+ transition((count_gray_1 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(count_gray[0]) <+ transition((count_gray_0 > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(count_bin[2]) <+ transition((count_bin_2_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(count_bin[1]) <+ transition((count_bin_1_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(count_bin[0]) <+ transition((count_bin_0_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(count_gray[2]) <+ transition((count_gray_2_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(count_gray[1]) <+ transition((count_gray_1_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(count_gray[0]) <+ transition((count_gray_0_val > vth) ? vhigh : vlow, tdel, trise, tfall);
   end
 endmodule

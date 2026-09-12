@@ -1,9 +1,9 @@
 {
   "module_name": "gray_counter",
   "summary": {
-    "total_gates": 5,
-    "total_inverter_equivalents_ge": 32.0,
-    "total_transistors": 64,
+    "total_gates": 11,
+    "total_inverter_equivalents_ge": 53.0,
+    "total_transistors": 106,
     "inverter_definition": "1 GE = 1 Inverter = 2 Transistors"
   },
   "ports": {
@@ -88,7 +88,83 @@
       "transistors": 16
     },
     {
-      "name": "U_COMB_1_count_gray_1_XOR2",
+      "name": "U_COMB_1_q_0_d_XOR2",
+      "cell_type": "XOR2",
+      "connections": {
+        "A": "q[0]",
+        "B": "ena",
+        "Y": "q[0]_d"
+      },
+      "level": 1,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
+    },
+    {
+      "name": "U_COMB_2_n_2_xor2_XOR2",
+      "cell_type": "XOR2",
+      "connections": {
+        "A": "q[1]",
+        "B": "ena",
+        "Y": "n_2_xor2"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
+    },
+    {
+      "name": "U_COMB_3_q_1_d_MUX2",
+      "cell_type": "MUX2",
+      "connections": {
+        "S": "q[0]",
+        "D0": "q[1]",
+        "D1": "n_2_xor2",
+        "Y": "q[1]_d"
+      },
+      "level": 1,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_4_n_4_and3_AND3",
+      "cell_type": "AND3",
+      "connections": {
+        "A": "q[0]",
+        "B": "q[1]",
+        "C": "ena",
+        "Y": "n_4_and3"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
+    },
+    {
+      "name": "U_COMB_5_n_5_nand3_NAND3",
+      "cell_type": "NAND3",
+      "connections": {
+        "A": "q[0]",
+        "B": "q[1]",
+        "C": "ena",
+        "Y": "n_5_nand3"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_6_q_2_d_MUX2",
+      "cell_type": "MUX2",
+      "connections": {
+        "S": "q[2]",
+        "D0": "n_4_and3",
+        "D1": "n_5_nand3",
+        "Y": "q[2]_d"
+      },
+      "level": 1,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_7_count_gray_1_XOR2",
       "cell_type": "XOR2",
       "connections": {
         "A": "q[2]",
@@ -100,7 +176,7 @@
       "transistors": 8
     },
     {
-      "name": "U_COMB_2_count_gray_0_XOR2",
+      "name": "U_COMB_8_count_gray_0_XOR2",
       "cell_type": "XOR2",
       "connections": {
         "A": "q[1]",

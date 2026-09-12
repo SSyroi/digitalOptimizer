@@ -25,11 +25,11 @@ procedure( create_gray_counter_schematic(libName cellName)
     ;; --- Column 1: Multi-Level Combinational Gates ---
     x = 3.0
     y = 0.0
-    ;; Node: q[0]_d = q[0]
+    ;; Node: q[0]_d = XOR2(q[0], ena)
     y = y + yStep
-    ;; Node: q[1]_d = q[1]
+    ;; Node: q[1]_d = MUX2(q[0], q[1], XOR2(q[1], ena))
     y = y + yStep
-    ;; Node: q[2]_d = q[2]
+    ;; Node: q[2]_d = MUX2(q[2], AND3(q[0], q[1], ena), NAND3(q[0], q[1], ena))
     y = y + yStep
     ;; Node: count_bin[0] = q[0]
     y = y + yStep

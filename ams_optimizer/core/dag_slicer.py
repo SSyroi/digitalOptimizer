@@ -115,14 +115,41 @@ class VerilogDAGSlicer:
                 dag.register_q_bits.append(f"{b}")
                 dag.register_d_bits.append(f"{b}_d")
 
+    def _extract_balanced_block(self, start_idx: int) -> str:
+        """Extracts text within balanced begin...end block, handling arbitrary nesting."""
+        depth = 1
+        i = start_idx
+        n = len(self.clean_code)
+        while i < n:
+            # Check for word boundary around "begin"
+            if self.clean_code.startswith("begin", i):
+                prev_char = self.clean_code[i-1] if i > 0 else " "
+                next_char = self.clean_code[i+5] if i + 5 < n else " "
+                if not (prev_char.isalnum() or prev_char == "_") and not (next_char.isalnum() or next_char == "_"):
+                    depth += 1
+                    i += 5
+                    continue
+            # Check for word boundary around "end"
+            elif self.clean_code.startswith("end", i):
+                prev_char = self.clean_code[i-1] if i > 0 else " "
+                next_char = self.clean_code[i+3] if i + 3 < n else " "
+                if not (prev_char.isalnum() or prev_char == "_") and not (next_char.isalnum() or next_char == "_"):
+                    depth -= 1
+                    if depth == 0:
+                        return self.clean_code[start_idx:i]
+                    i += 3
+                    continue
+            i += 1
+        return self.clean_code[start_idx:]
+
     def _parse_sequential_blocks(self, dag: SlicedDAG):
         # Look for sequential always blocks
-        for seq_match in re.finditer(r"always\s*@\s*\(\s*(posedge|negedge)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s+or\s+(posedge|negedge)\s+([A-Za-z_][A-Za-z0-9_]*))?\s*\)\s*begin(.*?)end\b", self.clean_code, re.DOTALL):
+        for seq_match in re.finditer(r"always\s*@\s*\(\s*(posedge|negedge)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s+or\s+(posedge|negedge)\s+([A-Za-z_][A-Za-z0-9_]*))?\s*\)\s*begin", self.clean_code):
             clk_edge = seq_match.group(1)
             clk_sig = seq_match.group(2)
             rst_edge = seq_match.group(3)
             rst_sig = seq_match.group(4)
-            body = seq_match.group(5)
+            body = self._extract_balanced_block(seq_match.end())
 
             # Update register attributes
             for r in dag.registers.values():
@@ -302,8 +329,8 @@ class VerilogDAGSlicer:
             self._create_assign_node(dag, lhs, rhs)
 
         # 2. Look for combinational always @(*) or always @* blocks
-        for comb_match in re.finditer(r"always\s*@\s*\(\s*\*\s*\)\s*begin(.*?)end\b|always\s*@\s*\*\s*begin(.*?)end\b", self.clean_code, re.DOTALL):
-            body = comb_match.group(1) or comb_match.group(2)
+        for comb_match in re.finditer(r"always\s*@\s*(?:\(\s*\*\s*\)|\*)\s*begin", self.clean_code):
+            body = self._extract_balanced_block(comb_match.end())
             self._parse_comb_always_body(dag, body)
 
         # 3. Ensure all primary outputs have a DAG node

@@ -7,19 +7,21 @@
 // Cadence Spectre & Virtuoso Compatible Verilog-A Model
 //
 // Circuit Complexity & Silicon Area Notes:
-//   - Total Gate Count         : 42 cells
-//   - Inverter Equivalents (GE) : 128.0 inverters (1 GE = 1 Inverter = 2 Transistors)
-//   - Est. Transistor Count    : ~256 transistors
+//   - Total Gate Count         : 49 cells
+//   - Inverter Equivalents (GE) : 150.0 inverters (1 GE = 1 Inverter = 2 Transistors)
+//   - Est. Transistor Count    : ~300 transistors
 //
 // Standard Cell Breakdown (Gate Counts & Inverter Weights):
 //   - AND2    :  12 cells ( 36.0 inverters eq.,   72 transistors)
-//   - AND3    :   2 cells (  8.0 inverters eq.,   16 transistors)
+//   - AND3    :   3 cells ( 12.0 inverters eq.,   24 transistors)
 //   - DFFR    :   4 cells ( 32.0 inverters eq.,   64 transistors)
-//   - INV     :  11 cells ( 11.0 inverters eq.,   22 transistors)
-//   - MUX2    :   4 cells ( 12.0 inverters eq.,   24 transistors)
+//   - INV     :  12 cells ( 12.0 inverters eq.,   24 transistors)
+//   - MUX2    :   6 cells ( 18.0 inverters eq.,   36 transistors)
+//   - NAND3   :   1 cells (  3.0 inverters eq.,    6 transistors)
 //   - NOR2    :   1 cells (  2.0 inverters eq.,    4 transistors)
 //   - OR2     :   5 cells ( 15.0 inverters eq.,   30 transistors)
 //   - OR3     :   3 cells ( 12.0 inverters eq.,   24 transistors)
+//   - XOR2    :   2 cells (  8.0 inverters eq.,   16 transistors)
 // ============================================================================
 
 module PWM_CTRL_va (clk, rst_n, en_LP_ext, oc_select_ext, oc_ctrl_cp_ext, c_DfT_oc_dig_VDD, cnt, en_LP, en_LowFreq, oc_select, oc_ctrl_bgr, oc_ctrl_cp, is_az_mode, eff_oc_mode);
@@ -142,16 +144,21 @@ module PWM_CTRL_va (clk, rst_n, en_LP_ext, oc_select_ext, oc_ctrl_cp_ext, c_DfT_
   endfunction
 
   // Internal State & Combinational Signals
-  real cnt_3_q, cnt_3_d;
-  real cnt_2_q, cnt_2_d;
-  real cnt_1_q, cnt_1_d;
   real cnt_0_q, cnt_0_d;
-  real eff_oc_mode_0;
-  real eff_oc_mode_1;
-  real is_az_mode;
-  real is_chop_mode;
-  real is_pwm_active_window;
-  real is_pwm_sample_window;
+  real cnt_1_q, cnt_1_d;
+  real cnt_2_q, cnt_2_d;
+  real cnt_3_q, cnt_3_d;
+  real eff_oc_mode_0_val;
+  real eff_oc_mode_1_val;
+  real is_az_mode_val;
+  real is_chop_mode_val;
+  real is_pwm_active_window_val;
+  real is_pwm_sample_window_val;
+  real en_LP_val;
+  real en_LowFreq_val;
+  real oc_select_val;
+  real oc_ctrl_bgr_val;
+  real oc_ctrl_cp_val;
 
   analog begin
     @(initial_step("static", "ac")) begin
@@ -170,38 +177,34 @@ module PWM_CTRL_va (clk, rst_n, en_LP_ext, oc_select_ext, oc_ctrl_cp_ext, c_DfT_
     end
 
     // Multi-Level Combinational Logic Evaluations
-    eff_oc_mode_0 = c_DfT_oc_dig_VDD[0];
-    eff_oc_mode_1 = c_DfT_oc_dig_VDD[1];
-    is_az_mode = NOR2(eff_oc_mode[1], eff_oc_mode[0]);
-    is_chop_mode = AND2(eff_oc_mode[1], INV(eff_oc_mode[0]));
-    is_pwm_active_window = OR2(OR2(OR2(AND2(cnt[2], INV(cnt[3])), AND2(INV(cnt[2]), cnt[3])), AND2(cnt[1], INV(cnt[3]))), AND3(INV(cnt[0]), INV(cnt[1]), cnt[3]));
-    is_pwm_sample_window = MUX2(cnt[0], AND3(cnt[1], cnt[2], cnt[3]), MUX2(cnt[1], AND2(cnt[2], cnt[3]), AND2(cnt[2], cnt[3])));
-    cnt_3 = cnt[3];
-    cnt_2 = cnt[2];
-    cnt_1 = cnt[1];
-    cnt_0 = cnt[0];
-    cnt_0_d = cnt[0];
-    cnt_1_d = cnt[1];
-    cnt_2_d = cnt[2];
-    cnt_3_d = cnt[3];
-    en_LP = OR3(is_az_mode, AND2(is_chop_mode, is_pwm_active_window), AND2(INV(is_chop_mode), V(en_LP_ext)));
-    en_LowFreq = MUX2(is_az_mode, OR2(INV(is_chop_mode), is_pwm_sample_window), 0.0);
-    oc_select = OR3(is_az_mode, AND2(is_chop_mode, is_pwm_active_window), AND2(INV(is_chop_mode), V(oc_select_ext)));
-    oc_ctrl_bgr = MUX2(is_az_mode, OR2(INV(is_chop_mode), is_pwm_sample_window), 0.0);
-    oc_ctrl_cp = OR3(is_az_mode, AND2(is_chop_mode, is_pwm_active_window), AND2(INV(is_chop_mode), V(oc_ctrl_cp_ext)));
+    cnt_0_d = INV(cnt_0_q);
+    cnt_1_d = XOR2(cnt_0_q, cnt_1_q);
+    cnt_2_d = MUX2(cnt_0_q, cnt_2_q, XOR2(cnt_1_q, cnt_2_q));
+    cnt_3_d = MUX2(cnt_3_q, AND3(cnt_0_q, cnt_1_q, cnt_2_q), NAND3(cnt_0_q, cnt_1_q, cnt_2_q));
+    eff_oc_mode_0_val = V(c_DfT_oc_dig_VDD[0]);
+    eff_oc_mode_1_val = V(c_DfT_oc_dig_VDD[1]);
+    is_az_mode_val = NOR2(eff_oc_mode_1_val, eff_oc_mode_0_val);
+    is_chop_mode_val = AND2(eff_oc_mode_1_val, INV(eff_oc_mode_0_val));
+    is_pwm_active_window_val = OR2(OR2(OR2(AND2(cnt_2_q, INV(cnt_3_q)), AND2(INV(cnt_2_q), cnt_3_q)), AND2(cnt_1_q, INV(cnt_3_q))), AND3(INV(cnt_0_q), INV(cnt_1_q), cnt_3_q));
+    is_pwm_sample_window_val = MUX2(cnt_0_q, AND3(cnt_1_q, cnt_2_q, cnt_3_q), MUX2(cnt_1_q, AND2(cnt_2_q, cnt_3_q), AND2(cnt_2_q, cnt_3_q)));
+    en_LP_val = OR3(AND2(INV(is_chop_mode_val), V(en_LP_ext)), is_az_mode_val, AND2(is_chop_mode_val, is_pwm_active_window_val));
+    en_LowFreq_val = MUX2(is_az_mode_val, OR2(is_pwm_sample_window_val, INV(is_chop_mode_val)), 0.0);
+    oc_select_val = OR3(AND2(INV(is_chop_mode_val), V(oc_select_ext)), is_az_mode_val, AND2(is_chop_mode_val, is_pwm_active_window_val));
+    oc_ctrl_bgr_val = MUX2(is_az_mode_val, OR2(is_pwm_sample_window_val, INV(is_chop_mode_val)), 0.0);
+    oc_ctrl_cp_val = OR3(AND2(INV(is_chop_mode_val), V(oc_ctrl_cp_ext)), is_az_mode_val, AND2(is_chop_mode_val, is_pwm_active_window_val));
 
     // Analog Electrical Output Drivers
     V(cnt[3]) <+ transition((cnt_3_q > vth) ? vhigh : vlow, tdel, trise, tfall);
     V(cnt[2]) <+ transition((cnt_2_q > vth) ? vhigh : vlow, tdel, trise, tfall);
     V(cnt[1]) <+ transition((cnt_1_q > vth) ? vhigh : vlow, tdel, trise, tfall);
     V(cnt[0]) <+ transition((cnt_0_q > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(en_LP) <+ transition((en_LP > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(en_LowFreq) <+ transition((en_LowFreq > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(oc_select) <+ transition((oc_select > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(oc_ctrl_bgr) <+ transition((oc_ctrl_bgr > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(oc_ctrl_cp) <+ transition((oc_ctrl_cp > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(is_az_mode) <+ transition((is_az_mode > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(eff_oc_mode[1]) <+ transition((eff_oc_mode_1 > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(eff_oc_mode[0]) <+ transition((eff_oc_mode_0 > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(en_LP) <+ transition((en_LP_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(en_LowFreq) <+ transition((en_LowFreq_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(oc_select) <+ transition((oc_select_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(oc_ctrl_bgr) <+ transition((oc_ctrl_bgr_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(oc_ctrl_cp) <+ transition((oc_ctrl_cp_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(is_az_mode) <+ transition((is_az_mode_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(eff_oc_mode[1]) <+ transition((eff_oc_mode_1_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(eff_oc_mode[0]) <+ transition((eff_oc_mode_0_val > vth) ? vhigh : vlow, tdel, trise, tfall);
   end
 endmodule

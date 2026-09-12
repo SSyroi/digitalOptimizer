@@ -27,21 +27,21 @@ procedure( create_PWM_CTRL_schematic(libName cellName)
     ;; --- Column 1: Multi-Level Combinational Gates ---
     x = 3.0
     y = 0.0
-    ;; Node: cnt[3] = cnt[3]
+    ;; Node: cnt[0] = cnt[0]
     y = y + yStep
-    ;; Node: cnt[2] = cnt[2]
+    ;; Node: cnt[0]_d = INV(cnt[0])
     y = y + yStep
     ;; Node: cnt[1] = cnt[1]
     y = y + yStep
-    ;; Node: cnt[0] = cnt[0]
+    ;; Node: cnt[1]_d = XOR2(cnt[0], cnt[1])
     y = y + yStep
-    ;; Node: cnt[0]_d = cnt[0]
+    ;; Node: cnt[2] = cnt[2]
     y = y + yStep
-    ;; Node: cnt[1]_d = cnt[1]
+    ;; Node: cnt[2]_d = MUX2(cnt[0], cnt[2], XOR2(cnt[1], cnt[2]))
     y = y + yStep
-    ;; Node: cnt[2]_d = cnt[2]
+    ;; Node: cnt[3] = cnt[3]
     y = y + yStep
-    ;; Node: cnt[3]_d = cnt[3]
+    ;; Node: cnt[3]_d = MUX2(cnt[3], AND3(cnt[0], cnt[1], cnt[2]), NAND3(cnt[0], cnt[1], cnt[2]))
     y = y + yStep
     ;; Node: eff_oc_mode[0] = c_DfT_oc_dig_VDD[0]
     y = y + yStep
@@ -55,15 +55,15 @@ procedure( create_PWM_CTRL_schematic(libName cellName)
     y = y + yStep
     ;; Node: is_pwm_sample_window = MUX2(cnt[0], AND3(cnt[1], cnt[2], cnt[3]), MUX2(cnt[1], AND2(cnt[2], cnt[3]), AND2(cnt[2], cnt[3])))
     y = y + yStep
-    ;; Node: en_LP = OR3(is_az_mode, AND2(is_chop_mode, is_pwm_active_window), AND2(INV(is_chop_mode), en_LP_ext))
+    ;; Node: en_LP = OR3(AND2(INV(is_chop_mode), en_LP_ext), is_az_mode, AND2(is_chop_mode, is_pwm_active_window))
     y = y + yStep
-    ;; Node: en_LowFreq = MUX2(is_az_mode, OR2(INV(is_chop_mode), is_pwm_sample_window), 0.0)
+    ;; Node: en_LowFreq = MUX2(is_az_mode, OR2(is_pwm_sample_window, INV(is_chop_mode)), 0.0)
     y = y + yStep
-    ;; Node: oc_select = OR3(is_az_mode, AND2(is_chop_mode, is_pwm_active_window), AND2(INV(is_chop_mode), oc_select_ext))
+    ;; Node: oc_select = OR3(AND2(INV(is_chop_mode), oc_select_ext), is_az_mode, AND2(is_chop_mode, is_pwm_active_window))
     y = y + yStep
-    ;; Node: oc_ctrl_bgr = MUX2(is_az_mode, OR2(INV(is_chop_mode), is_pwm_sample_window), 0.0)
+    ;; Node: oc_ctrl_bgr = MUX2(is_az_mode, OR2(is_pwm_sample_window, INV(is_chop_mode)), 0.0)
     y = y + yStep
-    ;; Node: oc_ctrl_cp = OR3(is_az_mode, AND2(is_chop_mode, is_pwm_active_window), AND2(INV(is_chop_mode), oc_ctrl_cp_ext))
+    ;; Node: oc_ctrl_cp = OR3(AND2(INV(is_chop_mode), oc_ctrl_cp_ext), is_az_mode, AND2(is_chop_mode, is_pwm_active_window))
     y = y + yStep
 
     ;; Save and Check

@@ -27,11 +27,11 @@ procedure( create_bandgap_trim_fsm_schematic(libName cellName)
     ;; --- Column 1: Multi-Level Combinational Gates ---
     x = 3.0
     y = 0.0
-    ;; Node: trim_reg[0]_d = MUX2(trim_reg[0], MUX2(start_trim, 0.0, NOR2(comp_high, done_reg)), MUX2(start_trim, 1.0, OR2(comp_high, done_reg)))
+    ;; Node: trim_reg[0]_d = INV(trim_reg[0])
     y = y + yStep
-    ;; Node: trim_reg[1]_d = MUX2(trim_reg[1], MUX2(start_trim, 0.0, MUX2(comp_high, AND2(trim_reg[0], INV(done_reg)), 0.0)), MUX2(start_trim, 1.0, MUX2(comp_high, OR2(done_reg, INV(trim_reg[0])), 1.0)))
+    ;; Node: trim_reg[1]_d = XOR2(trim_reg[0], trim_reg[1])
     y = y + yStep
-    ;; Node: trim_reg[2]_d = MUX2(trim_reg[2], MUX2(start_trim, 0.0, MUX2(comp_high, MUX2(trim_reg[1], 0.0, AND2(trim_reg[0], INV(done_reg))), 0.0)), MUX2(start_trim, 1.0, MUX2(comp_high, MUX2(trim_reg[1], 1.0, OR2(done_reg, INV(trim_reg[0]))), 1.0)))
+    ;; Node: trim_reg[2]_d = MUX2(trim_reg[0], trim_reg[2], XOR2(trim_reg[1], trim_reg[2]))
     y = y + yStep
     ;; Node: done_reg_d = MUX2(start_trim, done_reg, OR2(comp_high, done_reg))
     y = y + yStep

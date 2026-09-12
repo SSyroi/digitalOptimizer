@@ -37,9 +37,9 @@ procedure( create_sar_adc_ctrl_schematic(libName cellName)
     y = 0.0
     ;; Node: dac_reg[0]_d = MUX2(dac_reg[0], MUX2(state[2], 0.0, NOR2(state[1], state[0])), OR3(state[2], state[1], state[0]))
     y = y + yStep
-    ;; Node: dac_reg[1]_d = OR2(OR2(OR2(AND2(dac_reg[1], state[0]), AND3(INV(comp_out), dac_reg[1], state[2])), AND2(dac_reg[1], state[1])), AND3(INV(state[2]), state[1], state[0]))
+    ;; Node: dac_reg[1]_d = OR2(OR2(OR2(AND2(dac_reg[1], state[0]), AND2(dac_reg[1], state[1])), AND3(INV(comp_out), dac_reg[1], state[2])), AND3(INV(state[2]), state[1], state[0]))
     y = y + yStep
-    ;; Node: dac_reg[2]_d = OR2(OR2(OR2(AND3(dac_reg[2], INV(state[1]), state[0]), AND3(INV(state[2]), state[1], INV(state[0]))), AND2(dac_reg[2], state[2])), AND3(INV(comp_out), dac_reg[2], state[0]))
+    ;; Node: dac_reg[2]_d = OR2(OR2(OR2(AND2(dac_reg[2], state[2]), AND3(INV(state[2]), state[1], INV(state[0]))), AND3(dac_reg[2], INV(state[1]), state[0])), AND3(INV(comp_out), dac_reg[2], state[0]))
     y = y + yStep
     ;; Node: dac_reg[3]_d = OR2(OR2(OR2(AND2(dac_reg[3], state[0]), AND3(INV(state[2]), INV(state[1]), state[0])), AND3(INV(comp_out), dac_reg[3], state[1])), AND2(dac_reg[3], state[2]))
     y = y + yStep
