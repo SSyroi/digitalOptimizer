@@ -59,6 +59,10 @@ class FSMReachabilityAnalyzer:
             if unreachable:
                 self.unreachable_states = unreachable
 
+    def get_unreachable_states(self) -> Set[int]:
+        """Returns the set of discovered unreachable FSM states."""
+        return self.unreachable_states
+
     def get_dont_cares_for_inputs(self, pruned_inputs: List[str], true_minterms: List[int]) -> List[int]:
         """Maps unreachable FSM states to don't-cares if inputs match state registers."""
         dont_cares: List[int] = []

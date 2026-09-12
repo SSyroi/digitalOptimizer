@@ -187,11 +187,11 @@ module PWM_CTRL_va (clk, rst_n, en_LP_ext, oc_select_ext, oc_ctrl_cp_ext, c_DfT_
     is_chop_mode_val = AND2(eff_oc_mode_1_val, INV(eff_oc_mode_0_val));
     is_pwm_active_window_val = OR2(OR2(OR2(AND2(INV(cnt_2_q), cnt_3_q), AND2(cnt_2_q, INV(cnt_3_q))), AND2(cnt_1_q, INV(cnt_3_q))), AND3(INV(cnt_0_q), INV(cnt_1_q), cnt_3_q));
     is_pwm_sample_window_val = MUX2(cnt_0_q, AND3(cnt_1_q, cnt_2_q, cnt_3_q), MUX2(cnt_1_q, AND2(cnt_2_q, cnt_3_q), AND2(cnt_2_q, cnt_3_q)));
-    en_LP_val = OR3(AND2(is_chop_mode_val, is_pwm_active_window_val), AND2(INV(is_chop_mode_val), V(en_LP_ext)), is_az_mode_val);
+    en_LP_val = OR3(is_az_mode_val, AND2(INV(is_chop_mode_val), V(en_LP_ext)), AND2(is_chop_mode_val, is_pwm_active_window_val));
     en_LowFreq_val = MUX2(is_az_mode_val, OR2(INV(is_chop_mode_val), is_pwm_sample_window_val), 0.0);
-    oc_select_val = OR3(AND2(is_chop_mode_val, is_pwm_active_window_val), AND2(INV(is_chop_mode_val), V(oc_select_ext)), is_az_mode_val);
+    oc_select_val = OR3(is_az_mode_val, AND2(INV(is_chop_mode_val), V(oc_select_ext)), AND2(is_chop_mode_val, is_pwm_active_window_val));
     oc_ctrl_bgr_val = MUX2(is_az_mode_val, OR2(INV(is_chop_mode_val), is_pwm_sample_window_val), 0.0);
-    oc_ctrl_cp_val = OR3(AND2(is_chop_mode_val, is_pwm_active_window_val), AND2(INV(is_chop_mode_val), V(oc_ctrl_cp_ext)), is_az_mode_val);
+    oc_ctrl_cp_val = OR3(is_az_mode_val, AND2(INV(is_chop_mode_val), V(oc_ctrl_cp_ext)), AND2(is_chop_mode_val, is_pwm_active_window_val));
 
     // Analog Electrical Output Drivers
     V(cnt[3]) <+ transition((cnt_3_q > vth) ? vhigh : vlow, tdel, trise, tfall);

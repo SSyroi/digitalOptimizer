@@ -27,15 +27,23 @@ from .tech_mapper import TechnologyMapper
 from .netlist_generator import StructuralNetlistGenerator
 from .veriloga_emitter import VerilogAEmitter
 from .skill_emitter import SKILLEmitter
+from .equivalence_checker import FormalEquivalenceChecker
 
 
 class AMSOptimizer:
     """High-performance, zero-dependency Multi-Level AMS Digital Optimizer."""
 
-    def __init__(self, supply_voltage: float = 1.8, threshold_voltage: float = 0.9, skill_lib: str = "tsmcN65"):
+    def __init__(
+        self,
+        supply_voltage: float = 1.8,
+        threshold_voltage: float = 0.9,
+        skill_lib: str = "tsmcN65",
+        run_verification: bool = True
+    ):
         self.supply_voltage = supply_voltage
         self.threshold_voltage = threshold_voltage
         self.skill_lib = skill_lib
+        self.run_verification = run_verification
 
     def run(self, verilog_code: str) -> OptimizationResult:
         # Step 1: Multi-Level Slicing (Preserve intermediate conditions)
@@ -78,7 +86,13 @@ class AMSOptimizer:
         total_ge = sum(cnt * INVERTER_EQUIVALENTS.get(g, 2.0) for g, cnt in gate_breakdown.items())
         total_transistors = sum(cnt * TRANSISTOR_COST.get(g, 6) for g, cnt in gate_breakdown.items())
 
-        # Step 6: Emit Deliverables (Verilog-A & Virtuoso SKILL)
+        # Step 6: Formal Logic Equivalence Checking (LEC)
+        equivalence_result = None
+        if self.run_verification:
+            checker = FormalEquivalenceChecker(dag, mapped_nodes)
+            equivalence_result = checker.verify()
+
+        # Step 7: Emit Deliverables (Verilog-A & Virtuoso SKILL)
         va_emitter = VerilogAEmitter(
             dag=dag,
             mapped_nodes=mapped_nodes,
@@ -91,7 +105,7 @@ class AMSOptimizer:
         skill_emitter = SKILLEmitter(dag, mapped_nodes, self.skill_lib)
         skill_code = skill_emitter.emit()
 
-        # Step 7: Generate Detailed BOM Report with Inverter Equivalents
+        # Step 8: Generate Detailed BOM Report with Inverter Equivalents & Verification
         bom_lines = [
             f"# Schematic Bill of Materials (BOM) for `{dag.module_name}`",
             f"",
@@ -100,10 +114,20 @@ class AMSOptimizer:
             f"- **Total Gate Count**: {total_gates} cells",
             f"- **Inverter Equivalents (GE)**: {total_ge:.1f} inverters (1 GE = 1 Inverter = 2 Transistors)",
             f"- **Est. Total Transistors**: ~{total_transistors} transistors",
+        ]
+
+        if equivalence_result:
+            status_str = "100% PASSED (Equivalence Verified)" if equivalence_result.passed else "FAILED (Discrepancy Detected)"
+            bom_lines.extend([
+                f"- **Formal Equivalence Status**: {status_str}",
+                f"- **Verified Vectors**: {equivalence_result.matching_vectors} / {equivalence_result.total_vectors} ({equivalence_result.execution_time_seconds:.4f}s)",
+            ])
+
+        bom_lines.extend([
             f"",
             f"| Standard Cell | Count | Inverter Eq. / Cell | Total Inverters | Transistors / Cell | Total Transistors |",
             f"| :--- | :---: | :---: | :---: | :---: | :---: |",
-        ]
+        ])
         for g, cnt in sorted(gate_breakdown.items()):
             ge_per = INVERTER_EQUIVALENTS.get(g, 2.0)
             cost_per = TRANSISTOR_COST.get(g, 6)
@@ -131,4 +155,5 @@ class AMSOptimizer:
             total_gates=total_gates,
             total_inverter_equivalents=total_ge,
             total_transistors=total_transistors,
+            equivalence_result=equivalence_result,
         )

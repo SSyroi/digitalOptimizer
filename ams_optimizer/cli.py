@@ -30,7 +30,9 @@ def main():
     parser.add_argument("-o", "--output-va", help="Path to output Cadence Verilog-A file (.va)")
     parser.add_argument("--save-netlist", help="Path to output structural gate netlist in JSON format (.json)")
     parser.add_argument("--save-skill", help="Path to output Cadence Virtuoso SKILL schematic script (.il)")
-    parser.add_argument("--save-report", help="Path to save BOM Markdown report (.md)")
+    parser.add_argument("--save-report", help="Path to save BOM report (.txt / .md)")
+    parser.add_argument("--verify", dest="verify", action="store_true", default=True, help="Run Formal Logic Equivalence Checking (LEC) (default: enabled)")
+    parser.add_argument("--no-verify", dest="verify", action="store_false", help="Disable Formal Logic Equivalence Checking")
     parser.add_argument("--vdd", type=float, default=1.8, help="Supply voltage in Volts (default: 1.8)")
     parser.add_argument("--vth", type=float, default=0.9, help="Logic threshold voltage in Volts (default: 0.9)")
     parser.add_argument("--lib", default="tsmcN65", help="Target Cadence standard cell library name (default: tsmcN65)")
@@ -50,7 +52,12 @@ def main():
     print(f"Voltage: VDD={args.vdd}V, VTH={args.vth}V, Library: {args.lib}")
     print("=" * 78)
 
-    optimizer = AMSOptimizer(supply_voltage=args.vdd, threshold_voltage=args.vth, skill_lib=args.lib)
+    optimizer = AMSOptimizer(
+        supply_voltage=args.vdd,
+        threshold_voltage=args.vth,
+        skill_lib=args.lib,
+        run_verification=args.verify
+    )
     result = optimizer.run(verilog_code)
 
     print("\n--- Multi-Level Intermediate Conditions & Next-State Gates ---")
@@ -58,6 +65,18 @@ def main():
         mn = result.mapped_nodes.get(node_name)
         if mn:
             print(f"  {node_name:<24} = {mn.expression}")
+
+    if result.equivalence_result:
+        eq = result.equivalence_result
+        status_sym = "[PASS]" if eq.passed else "[FAIL]"
+        print(f"\n--- Formal Logic Equivalence Checking (LEC) ---")
+        print(f"  Status                : {status_sym} {'100% MATCH (Equivalence Verified)' if eq.passed else 'MISMATCH DETECTED'}")
+        print(f"  Stimulus Vectors      : {eq.matching_vectors} / {eq.total_vectors} matched ({eq.execution_time_seconds:.4f}s)")
+        print(f"  Signals Verified      : {len(eq.verified_signals)} signals (Primary Outputs + Register Next-States)")
+        if eq.mismatches:
+            print(f"  WARNING: {len(eq.mismatches)} discrepancies detected! First mismatch:")
+            print(f"    Signal: {eq.mismatches[0]['signal']}, Golden={eq.mismatches[0]['golden_val']}, Mapped={eq.mismatches[0]['optimized_val']}")
+            print(f"    Inputs: {eq.mismatches[0]['inputs']}")
 
     print("\n--- Schematic Bill of Materials (BOM) ---")
     for g, cnt in sorted(result.gate_breakdown.items()):

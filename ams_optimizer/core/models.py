@@ -8,7 +8,7 @@ Zero external dependencies. Compatible with Python 3.9+.
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 
 @dataclass
@@ -117,6 +117,17 @@ class StructuralNetlist:
 
 
 @dataclass
+class EquivalenceResult:
+    passed: bool
+    total_vectors: int
+    matching_vectors: int
+    verified_signals: List[str]
+    mismatches: List[Dict[str, Any]] = field(default_factory=list)
+    execution_time_seconds: float = 0.0
+    notes: str = ""
+
+
+@dataclass
 class OptimizationResult:
     module_name: str
     dag: SlicedDAG
@@ -129,6 +140,7 @@ class OptimizationResult:
     total_gates: int = 0
     total_inverter_equivalents: float = 0.0
     total_transistors: int = 0
+    equivalence_result: Optional[EquivalenceResult] = None
 
 
 # Physical transistor cost per CMOS standard cell
