@@ -1,8 +1,11 @@
 """Unified Optimization Pipeline for AMS Digital Blocks."""
 
 from __future__ import annotations
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
+import sympy
+from sympy.logic.boolalg import Boolean
 from .ast_parser import VerilogParser, ParsedModule
 from .library import Library, load_default_library
 from .synthesizer import LogicSynthesizer, SynthesizedCone
@@ -45,7 +48,10 @@ class OptimizerPipeline:
         parser = VerilogParser(verilog_code)
         parsed = parser.parse()
 
-        # 2. Synthesize Combinational Logic Cones
+        # 2. Inline intermediate combinational wires to eliminate unresolved symbols
+        self._inline_intermediate_wires(parsed)
+
+        # 3. Synthesize Combinational Logic Cones
         cones: Dict[str, SynthesizedCone] = {}
         used_gates: Set[str] = set()
         gate_breakdown: Dict[str, int] = {}
@@ -80,13 +86,13 @@ class OptimizerPipeline:
                 gate_breakdown[g] = gate_breakdown.get(g, 0) + cnt
                 used_gates.add(g)
 
-        # 3. Formal Equivalence Verification
+        # 4. Formal Equivalence Verification
         verification = self.verifier.verify_module(parsed, cones)
 
-        # 4. Generate Verilog-A Module
+        # 5. Generate Verilog-A Module
         va_code = self.va_emitter.emit(parsed, reg_exprs, out_exprs, used_gates)
 
-        # 5. Generate Schematic Guides & Netlists
+        # 6. Generate Schematic Guides & Netlists
         instances = self.schem_emitter.extract_schematic_instances(parsed, cones)
         schem_report = self.schem_emitter.generate_markdown_report(parsed, instances)
         skill_script = self.schem_emitter.generate_cadence_skill(parsed, instances, virtuoso_lib)
@@ -114,3 +120,49 @@ class OptimizerPipeline:
             total_transistors=total_trans,
             gate_breakdown=gate_breakdown,
         )
+
+    def _inline_intermediate_wires(self, parsed: ParsedModule):
+        """Recursively inline intermediate combinational wires so logic trees only reference inputs and registers."""
+        primary_in_symbols = {
+            sympy.Symbol(re.sub(r"\[(\d+)\]", r"_\1_", sig))
+            for sig in parsed.get_all_input_signals()
+        }
+        state_symbols = {
+            sympy.Symbol(re.sub(r"\[(\d+)\]", r"_\1_", reg.name))
+            for reg in parsed.registers
+        }
+        output_symbols = {
+            sympy.Symbol(re.sub(r"\[(\d+)\]", r"_\1_", out_sig))
+            for port in parsed.ports.values() if port.direction == "output"
+            for out_sig in port.get_bit_names()
+        }
+
+        # Collect internal wire definitions
+        comb_map: Dict[sympy.Symbol, Boolean] = {}
+        for comb in parsed.comb_assignments:
+            clean_sym = sympy.Symbol(re.sub(r"\[(\d+)\]", r"_\1_", comb.target))
+            if clean_sym not in primary_in_symbols and clean_sym not in state_symbols:
+                if comb.expr_bool is not None:
+                    comb_map[clean_sym] = comb.expr_bool
+
+        # Iterate to inline dependencies
+        for _ in range(5):
+            changed = False
+            for k, v in list(comb_map.items()):
+                if v is not None:
+                    new_v = v.subs(comb_map)
+                    if new_v != v:
+                        comb_map[k] = new_v
+                        changed = True
+            if not changed:
+                break
+
+        # Apply inlining to registers
+        for reg in parsed.registers:
+            if reg.d_expr_bool is not None:
+                reg.d_expr_bool = reg.d_expr_bool.subs(comb_map)
+
+        # Apply inlining to outputs
+        for comb in parsed.comb_assignments:
+            if comb.expr_bool is not None:
+                comb.expr_bool = comb.expr_bool.subs(comb_map)

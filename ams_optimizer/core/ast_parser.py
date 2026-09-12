@@ -179,11 +179,8 @@ class VerilogExprParser:
         while self.peek()[0] in ("GT", "GTE", "LT", "LTE"):
             op = self.consume()[0]
             right_tok = self.peek()
-            # If comparing identifier to literal, expand bit comparator
             if right_tok[0] in ("LITERAL", "IDENT"):
-                # Handle comparison
                 val_num = self._get_numeric_val(right_tok[1])
-                # If left was a vector symbol
                 node = self._build_relational_expr(node, op, val_num)
                 self.consume()
         return node
@@ -223,7 +220,6 @@ class VerilogExprParser:
     def parse_not(self) -> Boolean:
         if self.peek()[0] == "NOT":
             self.consume("NOT")
-            # Check if next is a vector IDENT
             next_tok = self.peek()
             if next_tok[0] == "IDENT" and "[" not in next_tok[1] and self.signal_widths.get(next_tok[1], 1) > 1:
                 ident = self.consume("IDENT")[1]
@@ -280,14 +276,9 @@ class VerilogExprParser:
         return 0
 
     def _build_relational_expr(self, left_node: Boolean, op: str, val: int) -> Boolean:
-        # Fallback relational builder for scalar / vector expressions
-        if op == "GT":
+        if op in ("GT", "GTE"):
             return left_node
-        elif op == "GTE":
-            return left_node
-        elif op == "LT":
-            return Not(left_node)
-        elif op == "LTE":
+        elif op in ("LT", "LTE"):
             return Not(left_node)
         return left_node
 
@@ -501,8 +492,8 @@ class VerilogParser:
             )
 
     def _parse_combinational_procedural_blocks(self, parsed: ParsedModule):
-        """Parse always @* or always @(...) combinational procedural blocks."""
-        comb_pattern = re.compile(r"always\s*@\s*(?:\*\s*|\((?!(?:posedge|negedge)\b).*?\))\s*(?:begin)?", re.DOTALL)
+        """Parse always @* or always @(*) or always @(...) combinational procedural blocks."""
+        comb_pattern = re.compile(r"always\s*@\s*(?:\*\s*|\(\s*\*\s*\)|\((?!(?:posedge|negedge)\b).*?\))\s*(?:begin)?", re.DOTALL)
         signal_widths = {s.name: s.width for s in parsed.signals.values()}
 
         for match in comb_pattern.finditer(self.clean_code):
@@ -538,6 +529,10 @@ class VerilogParser:
                         bval = self.convert_to_sympy(bexpr, signal_widths, parsed.parameters)
                         if bval is not None:
                             bit_assignments.setdefault(bname, []).append((cond, bval))
+                elif "[" in lhs:
+                    bval = self.convert_to_sympy(rhs, signal_widths, parsed.parameters)
+                    if bval is not None:
+                        bit_assignments.setdefault(lhs, []).append((cond, bval))
                 else:
                     bval = self.convert_to_sympy(rhs, signal_widths, parsed.parameters)
                     if bval is not None:
@@ -677,22 +672,43 @@ class VerilogParser:
 
     def _decompose_vector_rhs(self, lhs: str, rhs: str, width: int) -> List[str]:
         rhs_clean = rhs.strip()
-        cnt_match = re.search(rf"\b{re.escape(lhs)}\s*\+\s*(\d+'b1|\d+'d1|1\b|\d+'d[0-9]+)", rhs_clean)
-        if cnt_match:
+
+        # Vector addition: lhs + K or lhs + 4'b0001
+        cnt_add_match = re.search(rf"\b{re.escape(lhs)}\s*\+\s*(\d+'[bBdDhH][0-9a-fA-F]+|\d+)", rhs_clean)
+        if cnt_add_match:
+            k_str = cnt_add_match.group(1)
+            k_val = self._parse_verilog_literal(k_str)
             bit_exprs = []
-            carry_chain = []
+            carry = ""
             for i in range(width):
                 q_i = f"{lhs}[{i}]"
+                k_i = (k_val >> i) & 1
                 if i == 0:
-                    next_val = f"~{q_i}"
-                    carry_chain.append(q_i)
+                    if k_i == 1:
+                        next_val = f"~{q_i}"
+                        carry = q_i
+                    else:
+                        next_val = q_i
+                        carry = "1'b0"
                 else:
-                    carry_expr = " & ".join(carry_chain)
-                    next_val = f"({q_i} ^ ({carry_expr}))"
-                    carry_chain.append(q_i)
+                    if k_i == 1:
+                        if carry and carry != "1'b0":
+                            next_val = f"({q_i} ^ ~({carry}))"
+                            carry = f"({q_i} | {carry})"
+                        else:
+                            next_val = f"~{q_i}"
+                            carry = q_i
+                    else:
+                        if carry and carry != "1'b0":
+                            next_val = f"({q_i} ^ ({carry}))"
+                            carry = f"({q_i} & {carry})"
+                        else:
+                            next_val = q_i
+                            carry = "1'b0"
                 bit_exprs.append(next_val)
             return bit_exprs
 
+        # Shift concatenation {a, b}
         shift_match = re.search(r"\{\s*([a-zA-Z_0-9\[\]:]+)\s*,\s*([a-zA-Z_0-9\[\]:]+)\s*\}", rhs_clean)
         if shift_match:
             left_part, right_part = shift_match.groups()
@@ -707,6 +723,11 @@ class VerilogParser:
         if lit_match:
             val_num = self._parse_verilog_literal(rhs_clean)
             return [f"1'b{(val_num >> i) & 1}" for i in range(width)]
+
+        # Vector to vector direct assignment (e.g. eff_oc_mode = c_DfT_oc_dig_VDD)
+        # If rhs_clean is a single identifier without brackets, index it
+        if re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", rhs_clean):
+            return [f"{rhs_clean}[{i}]" for i in range(width)]
 
         bit_exprs = []
         for i in range(width):
@@ -755,10 +776,8 @@ class VerilogParser:
                 bit_names = port.get_bit_names()
                 for bname in bit_names:
                     if bname not in assigned_targets:
-                        # If port name without brackets matches an internal signal or register
                         if pname in assigned_targets:
                             continue
-                        # If a registered signal with same base name exists (e.g. out_reg vs out)
                         matched = False
                         for candidate in (pname, f"{pname}_reg", f"{pname}_q"):
                             if candidate in assigned_targets:
@@ -772,7 +791,6 @@ class VerilogParser:
                                 matched = True
                                 break
                         if not matched:
-                            # Default tie to 0
                             parsed.comb_assignments.append(
                                 CombinationalAssignment(
                                     target=bname,
