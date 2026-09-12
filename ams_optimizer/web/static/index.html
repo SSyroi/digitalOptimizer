@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AMS Digital Optimizer & Synthesizer</title>
+  <meta name="description" content="Synthesis and logic optimization engine for Analog and Mixed-Signal (AMS) custom IC blocks. Generates schematic-ready nested gate expressions and Verilog-A views.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <!-- App Container -->
+  <div class="app-container">
+    
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="brand-group">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="2" width="20" height="8" rx="2" />
+            <rect x="2" y="14" width="20" height="8" rx="2" />
+            <line x1="6" y1="6" x2="6.01" y2="6" />
+            <line x1="6" y1="18" x2="6.01" y2="18" />
+            <path d="M12 10v4" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">AMS Digital Optimizer & Synthesizer</h1>
+          <p class="brand-subtitle">Custom Analog Standard Cell Mapping & Verilog-A Generator</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="control-group">
+          <label for="example-select">Load Example:</label>
+          <select id="example-select" class="dropdown-select">
+            <option value="">-- Choose Example --</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="virtuoso-lib-input">Virtuoso Lib:</label>
+          <input type="text" id="virtuoso-lib-input" value="MY_AMS_LIB" class="text-input" style="width: 120px;">
+        </div>
+
+        <button id="btn-synthesize" class="btn btn-primary" title="Press Ctrl+Enter or Cmd+Enter to run">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span>Synthesize & Optimize</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="workspace-layout">
+      
+      <!-- Left Column: Verilog Input & Library Settings -->
+      <section class="panel left-panel">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 18 22 12 16 6"></polyline>
+              <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+            <h2>Behavioral Verilog RTL</h2>
+          </div>
+          <span class="badge badge-info">Input RTL</span>
+        </div>
+
+        <div class="editor-wrapper">
+          <textarea id="verilog-editor" class="code-editor" spellcheck="false" placeholder="// Paste or write your behavioral Verilog RTL here..."></textarea>
+        </div>
+
+        <!-- Cell Library Palette Accordion -->
+        <div class="library-drawer">
+          <div class="drawer-header" id="drawer-toggle">
+            <span class="drawer-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              </svg>
+              Available AMS Cell Library (<span id="cell-count-badge">19</span> gates)
+            </span>
+            <span class="drawer-arrow">▼</span>
+          </div>
+          <div class="drawer-body" id="drawer-content">
+            <p class="drawer-desc">Mapped standard cells with Boolean formulas & transistor weights:</p>
+            <div id="cell-chips-container" class="cell-chips"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Results & Export Hub -->
+      <section class="panel right-panel">
+        
+        <!-- Navigation Tabs -->
+        <div class="tabs-nav">
+          <button class="tab-btn active" data-tab="tab-equations">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="4" y1="9" x2="20" y2="9"></line>
+              <line x1="4" y1="15" x2="20" y2="15"></line>
+              <line x1="10" y1="3" x2="8" y2="21"></line>
+              <line x1="16" y1="3" x2="14" y2="21"></line>
+            </svg>
+            <span>Nested Gate Logic</span>
+          </button>
+          
+          <button class="tab-btn" data-tab="tab-veriloga">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            <span>Verilog-A View</span>
+          </button>
+
+          <button class="tab-btn" data-tab="tab-bom">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
+            <span>Schematic & BOM</span>
+          </button>
+
+          <button class="tab-btn" data-tab="tab-netlists">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            <span>SKILL & SPICE</span>
+          </button>
+
+          <button class="tab-btn" data-tab="tab-verif">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            <span>Formal Verification</span>
+          </button>
+        </div>
+
+        <!-- Tab 1: Equations & DFFs -->
+        <div id="tab-equations" class="tab-pane active">
+          <div class="pane-action-bar">
+            <div class="metrics-row">
+              <div class="metric-badge">
+                <span class="metric-label">Sequential DFFs:</span>
+                <span id="metric-dffs" class="metric-value">0</span>
+              </div>
+              <div class="metric-badge">
+                <span class="metric-label">Logic Gates:</span>
+                <span id="metric-gates" class="metric-value">0</span>
+              </div>
+              <div class="metric-badge">
+                <span class="metric-label">Est. Transistors:</span>
+                <span id="metric-transistors" class="metric-value">~0</span>
+              </div>
+            </div>
+            <button id="btn-copy-equations" class="btn btn-secondary btn-sm">Copy All Formulas</button>
+          </div>
+
+          <div class="equations-container">
+            <h3 class="section-subtitle">1. Sequential State Registers (DFF Next-State Logic)</h3>
+            <div id="registers-list" class="equation-cards-grid">
+              <p class="placeholder-text">Click "Synthesize & Optimize" to extract sequential state registers.</p>
+            </div>
+
+            <h3 class="section-subtitle" style="margin-top: 24px;">2. Combinational Outputs</h3>
+            <div id="outputs-list" class="equation-cards-grid">
+              <p class="placeholder-text">Click "Synthesize & Optimize" to generate combinational outputs.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Verilog-A View -->
+        <div id="tab-veriloga" class="tab-pane">
+          <div class="pane-action-bar">
+            <span class="action-info">Ready for Cadence Spectre / AMS Designer simulation</span>
+            <div class="btn-group">
+              <button id="btn-copy-va" class="btn btn-secondary btn-sm">Copy Code</button>
+              <button id="btn-download-va" class="btn btn-primary btn-sm">Download .va</button>
+            </div>
+          </div>
+          <pre class="code-view"><code id="code-veriloga">// Verilog-A code will appear here...</code></pre>
+        </div>
+
+        <!-- Tab 3: Schematic & BOM -->
+        <div id="tab-bom" class="tab-pane">
+          <div class="pane-action-bar">
+            <span class="action-info">Instance bill of materials and wiring guide for manual schematic entry</span>
+            <button id="btn-download-bom" class="btn btn-secondary btn-sm">Download Guide (.md)</button>
+          </div>
+          
+          <div class="bom-section">
+            <h3 class="section-subtitle">Standard Cell Bill of Materials</h3>
+            <table class="data-table" id="table-bom">
+              <thead>
+                <tr>
+                  <th>Cell Type</th>
+                  <th>Category</th>
+                  <th>Count</th>
+                  <th>Transistors / Cell</th>
+                  <th>Total Transistors</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-bom">
+                <tr><td colspan="5" class="placeholder-text">No synthesis results yet.</td></tr>
+              </tbody>
+            </table>
+
+            <h3 class="section-subtitle" style="margin-top: 24px;">Gate-by-Gate Wiring Instructions</h3>
+            <table class="data-table" id="table-instances">
+              <thead>
+                <tr>
+                  <th>Instance</th>
+                  <th>Cell</th>
+                  <th>Pin Connections</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-instances">
+                <tr><td colspan="3" class="placeholder-text">No synthesis results yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 4: SKILL & SPICE -->
+        <div id="tab-netlists" class="tab-pane">
+          <div class="pane-action-bar">
+            <div class="subtabs">
+              <button class="subtab-btn active" id="btn-show-skill">Cadence SKILL (.il)</button>
+              <button class="subtab-btn" id="btn-show-spice">CDL / SPICE (.sp)</button>
+            </div>
+            <button id="btn-download-netlist" class="btn btn-secondary btn-sm">Download File</button>
+          </div>
+          <pre class="code-view"><code id="code-netlist">// Script/Netlist code will appear here...</code></pre>
+        </div>
+
+        <!-- Tab 5: Formal Verification -->
+        <div id="tab-verif" class="tab-pane">
+          <div id="verif-card" class="verif-result-card">
+            <div class="verif-status-badge">
+              <div class="status-indicator"></div>
+              <span id="verif-title">No Verification Run</span>
+            </div>
+            <p id="verif-desc" class="verif-description">Run synthesis to perform mathematical logic equivalence checking.</p>
+            <div id="verif-details" class="verif-details-grid"></div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
