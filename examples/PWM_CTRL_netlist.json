@@ -290,7 +290,7 @@
       "name": "U_COMB_11_n_11_inv_INV",
       "cell_type": "INV",
       "connections": {
-        "A": "cnt[3]",
+        "A": "cnt[2]",
         "Y": "n_11_inv"
       },
       "level": 5,
@@ -301,8 +301,8 @@
       "name": "U_COMB_12_n_11_and2_AND2",
       "cell_type": "AND2",
       "connections": {
-        "A": "cnt[2]",
-        "B": "n_11_inv",
+        "A": "n_11_inv",
+        "B": "cnt[3]",
         "Y": "n_11_and2"
       },
       "level": 4,
@@ -313,7 +313,7 @@
       "name": "U_COMB_13_n_13_inv_INV",
       "cell_type": "INV",
       "connections": {
-        "A": "cnt[2]",
+        "A": "cnt[3]",
         "Y": "n_13_inv"
       },
       "level": 5,
@@ -324,8 +324,8 @@
       "name": "U_COMB_14_n_13_and2_AND2",
       "cell_type": "AND2",
       "connections": {
-        "A": "n_13_inv",
-        "B": "cnt[3]",
+        "A": "cnt[2]",
+        "B": "n_13_inv",
         "Y": "n_13_and2"
       },
       "level": 4,
@@ -468,22 +468,11 @@
       "transistors": 6
     },
     {
-      "name": "U_COMB_26_n_26_inv_INV",
-      "cell_type": "INV",
-      "connections": {
-        "A": "is_chop_mode",
-        "Y": "n_26_inv"
-      },
-      "level": 4,
-      "inverter_equivalent_ge": 1.0,
-      "transistors": 2
-    },
-    {
-      "name": "U_COMB_27_n_26_and2_AND2",
+      "name": "U_COMB_26_n_26_and2_AND2",
       "cell_type": "AND2",
       "connections": {
-        "A": "n_26_inv",
-        "B": "en_LP_ext",
+        "A": "is_chop_mode",
+        "B": "is_pwm_active_window",
         "Y": "n_26_and2"
       },
       "level": 3,
@@ -491,12 +480,23 @@
       "transistors": 6
     },
     {
-      "name": "U_COMB_28_n_28_and2_AND2",
-      "cell_type": "AND2",
+      "name": "U_COMB_27_n_27_inv_INV",
+      "cell_type": "INV",
       "connections": {
         "A": "is_chop_mode",
-        "B": "is_pwm_active_window",
-        "Y": "n_28_and2"
+        "Y": "n_27_inv"
+      },
+      "level": 4,
+      "inverter_equivalent_ge": 1.0,
+      "transistors": 2
+    },
+    {
+      "name": "U_COMB_28_n_27_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "n_27_inv",
+        "B": "en_LP_ext",
+        "Y": "n_27_and2"
       },
       "level": 3,
       "inverter_equivalent_ge": 3.0,
@@ -507,8 +507,8 @@
       "cell_type": "OR3",
       "connections": {
         "A": "n_26_and2",
-        "B": "is_az_mode",
-        "C": "n_28_and2",
+        "B": "n_27_and2",
+        "C": "is_az_mode",
         "Y": "en_LP"
       },
       "level": 2,
@@ -519,8 +519,8 @@
       "name": "U_COMB_30_n_30_or2_OR2",
       "cell_type": "OR2",
       "connections": {
-        "A": "is_pwm_sample_window",
-        "B": "n_30_inv",
+        "A": "n_30_inv",
+        "B": "is_pwm_sample_window",
         "Y": "n_30_or2"
       },
       "level": 3,
@@ -544,8 +544,8 @@
       "name": "U_COMB_32_n_32_and2_AND2",
       "cell_type": "AND2",
       "connections": {
-        "A": "n_32_inv",
-        "B": "oc_select_ext",
+        "A": "is_chop_mode",
+        "B": "is_pwm_active_window",
         "Y": "n_32_and2"
       },
       "level": 3,
@@ -556,8 +556,8 @@
       "name": "U_COMB_33_n_33_and2_AND2",
       "cell_type": "AND2",
       "connections": {
-        "A": "is_chop_mode",
-        "B": "is_pwm_active_window",
+        "A": "n_33_inv",
+        "B": "oc_select_ext",
         "Y": "n_33_and2"
       },
       "level": 3,
@@ -569,8 +569,8 @@
       "cell_type": "OR3",
       "connections": {
         "A": "n_32_and2",
-        "B": "is_az_mode",
-        "C": "n_33_and2",
+        "B": "n_33_and2",
+        "C": "is_az_mode",
         "Y": "oc_select"
       },
       "level": 2,
@@ -581,8 +581,8 @@
       "name": "U_COMB_35_n_35_or2_OR2",
       "cell_type": "OR2",
       "connections": {
-        "A": "is_pwm_sample_window",
-        "B": "n_35_inv",
+        "A": "n_35_inv",
+        "B": "is_pwm_sample_window",
         "Y": "n_35_or2"
       },
       "level": 3,
@@ -606,8 +606,8 @@
       "name": "U_COMB_37_n_37_and2_AND2",
       "cell_type": "AND2",
       "connections": {
-        "A": "n_37_inv",
-        "B": "oc_ctrl_cp_ext",
+        "A": "is_chop_mode",
+        "B": "is_pwm_active_window",
         "Y": "n_37_and2"
       },
       "level": 3,
@@ -618,8 +618,8 @@
       "name": "U_COMB_38_n_38_and2_AND2",
       "cell_type": "AND2",
       "connections": {
-        "A": "is_chop_mode",
-        "B": "is_pwm_active_window",
+        "A": "n_38_inv",
+        "B": "oc_ctrl_cp_ext",
         "Y": "n_38_and2"
       },
       "level": 3,
@@ -631,8 +631,8 @@
       "cell_type": "OR3",
       "connections": {
         "A": "n_37_and2",
-        "B": "is_az_mode",
-        "C": "n_38_and2",
+        "B": "n_38_and2",
+        "C": "is_az_mode",
         "Y": "oc_ctrl_cp"
       },
       "level": 2,

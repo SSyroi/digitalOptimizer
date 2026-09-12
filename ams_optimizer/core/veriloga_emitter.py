@@ -120,6 +120,18 @@ class VerilogAEmitter:
                 lines.append(f"  real {safe_var};")
                 declared_vars.add(safe_var)
 
+        # Safety: Ensure EVERY output port has its _val declared!
+        for p_name, p in self.dag.ports.items():
+            if p.direction == "output":
+                for b_name in p.bit_names:
+                    base_name = b_name.split("[")[0]
+                    if base_name in self.dag.registers:
+                        continue
+                    safe_var = b_name.replace("[", "_").replace("]", "") + "_val"
+                    if safe_var not in declared_vars:
+                        lines.append(f"  real {safe_var};")
+                        declared_vars.add(safe_var)
+
         lines.append("")
 
         # 7. Analog Begin Block
@@ -168,6 +180,17 @@ class VerilogAEmitter:
                     continue  # Register outputs driven by _q
                 val_var = node_name.replace("[", "_").replace("]", "") + "_val"
                 lines.append(f"    {val_var} = {expr_str};")
+
+        # Safety: default 0.0 for any output port missing from dag.nodes
+        for p_name, p in self.dag.ports.items():
+            if p.direction == "output":
+                for b_name in p.bit_names:
+                    base_name = b_name.split("[")[0]
+                    if base_name in self.dag.registers:
+                        continue
+                    if b_name not in self.dag.nodes:
+                        safe_var = b_name.replace("[", "_").replace("]", "") + "_val"
+                        lines.append(f"    {safe_var} = 0.0;")
 
         lines.append("")
 

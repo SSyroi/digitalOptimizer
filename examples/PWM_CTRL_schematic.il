@@ -51,19 +51,19 @@ procedure( create_PWM_CTRL_schematic(libName cellName)
     y = y + yStep
     ;; Node: is_chop_mode = AND2(eff_oc_mode[1], INV(eff_oc_mode[0]))
     y = y + yStep
-    ;; Node: is_pwm_active_window = OR2(OR2(OR2(AND2(cnt[2], INV(cnt[3])), AND2(INV(cnt[2]), cnt[3])), AND2(cnt[1], INV(cnt[3]))), AND3(INV(cnt[0]), INV(cnt[1]), cnt[3]))
+    ;; Node: is_pwm_active_window = OR2(OR2(OR2(AND2(INV(cnt[2]), cnt[3]), AND2(cnt[2], INV(cnt[3]))), AND2(cnt[1], INV(cnt[3]))), AND3(INV(cnt[0]), INV(cnt[1]), cnt[3]))
     y = y + yStep
     ;; Node: is_pwm_sample_window = MUX2(cnt[0], AND3(cnt[1], cnt[2], cnt[3]), MUX2(cnt[1], AND2(cnt[2], cnt[3]), AND2(cnt[2], cnt[3])))
     y = y + yStep
-    ;; Node: en_LP = OR3(AND2(INV(is_chop_mode), en_LP_ext), is_az_mode, AND2(is_chop_mode, is_pwm_active_window))
+    ;; Node: en_LP = OR3(AND2(is_chop_mode, is_pwm_active_window), AND2(INV(is_chop_mode), en_LP_ext), is_az_mode)
     y = y + yStep
-    ;; Node: en_LowFreq = MUX2(is_az_mode, OR2(is_pwm_sample_window, INV(is_chop_mode)), 0.0)
+    ;; Node: en_LowFreq = MUX2(is_az_mode, OR2(INV(is_chop_mode), is_pwm_sample_window), 0.0)
     y = y + yStep
-    ;; Node: oc_select = OR3(AND2(INV(is_chop_mode), oc_select_ext), is_az_mode, AND2(is_chop_mode, is_pwm_active_window))
+    ;; Node: oc_select = OR3(AND2(is_chop_mode, is_pwm_active_window), AND2(INV(is_chop_mode), oc_select_ext), is_az_mode)
     y = y + yStep
-    ;; Node: oc_ctrl_bgr = MUX2(is_az_mode, OR2(is_pwm_sample_window, INV(is_chop_mode)), 0.0)
+    ;; Node: oc_ctrl_bgr = MUX2(is_az_mode, OR2(INV(is_chop_mode), is_pwm_sample_window), 0.0)
     y = y + yStep
-    ;; Node: oc_ctrl_cp = OR3(AND2(INV(is_chop_mode), oc_ctrl_cp_ext), is_az_mode, AND2(is_chop_mode, is_pwm_active_window))
+    ;; Node: oc_ctrl_cp = OR3(AND2(is_chop_mode, is_pwm_active_window), AND2(INV(is_chop_mode), oc_ctrl_cp_ext), is_az_mode)
     y = y + yStep
 
     ;; Save and Check

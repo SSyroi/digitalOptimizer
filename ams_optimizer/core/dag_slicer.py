@@ -346,6 +346,15 @@ class VerilogDAGSlicer:
                         level=0,
                         raw_expr=out_bit
                     )
+                else:
+                    dag.nodes[out_bit] = DAGNode(
+                        name=out_bit,
+                        node_type="primary_output",
+                        inputs=[],
+                        eval_fn=lambda inp: 0,
+                        level=0,
+                        raw_expr="0.0"
+                    )
 
     def _create_assign_node(self, dag: SlicedDAG, lhs: str, rhs: str):
         # Case A: Vector assign (e.g. assign count = cnt_reg; or assign count_bin = q;)
@@ -493,43 +502,61 @@ class VerilogDAGSlicer:
             return
 
     def _build_multiplexed_output_nodes(self, dag: SlicedDAG, body: str):
-        """Builds multi-level multiplexer logic for primary outputs from if-else trees."""
-        outputs_in_block = ["en_LP", "en_LowFreq", "oc_select", "oc_ctrl_bgr", "oc_ctrl_cp"]
-        for out in outputs_in_block:
-            if out in dag.ports:
-                dep_inputs = ["is_az_mode", "is_chop_mode", f"{out}_ext", "is_pwm_active_window", "is_pwm_sample_window"]
-                valid_deps = [inp for inp in dep_inputs if inp in dag.nodes or inp in dag.primary_inputs]
+        """Dynamically builds multiplexer logic for primary outputs from arbitrary if-else trees."""
+        branches: List[Tuple[Optional[str], Dict[str, str]]] = []
+        # Find if (...) begin ... end, else if (...) begin ... end, else begin ... end
+        for m in re.finditer(r"(?:(else\s+if|if)\s*\((.*?)\)\s*begin|else\s*begin)(.*?)end", body, re.DOTALL):
+            cond = m.group(2).strip() if m.group(2) else None
+            content = m.group(3)
+            assigns = dict(re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;]+);", content))
+            branches.append((cond, assigns))
 
-                def make_pwm_mux_eval(sig_name: str):
-                    def _eval(inp: Dict[str, int]) -> int:
-                        is_az = inp.get("is_az_mode", 0)
-                        is_chop = inp.get("is_chop_mode", 0)
-                        is_act = inp.get("is_pwm_active_window", 0)
-                        is_samp = inp.get("is_pwm_sample_window", 0)
-                        ext_val = inp.get(f"{sig_name}_ext", 1 if "LowFreq" in sig_name or "bgr" in sig_name else 0)
+        all_targets: Set[str] = set()
+        for _, assigns in branches:
+            all_targets.update(assigns.keys())
 
-                        if is_az:
-                            if sig_name in ("en_LP", "oc_select", "oc_ctrl_cp"):
-                                return 1
-                            else:
-                                return 0
-                        elif is_chop:
-                            if sig_name in ("en_LP", "oc_select", "oc_ctrl_cp"):
-                                return is_act
-                            else:
-                                return is_samp
-                        else:
-                            return ext_val
-                    return _eval
+        for out in all_targets:
+            # Find all rules for this output
+            v_rules = [(c, a[out].strip()) for c, a in branches if c and out in a]
+            else_val_list = [a[out].strip() for c, a in branches if not c and out in a]
+            else_val = else_val_list[0] if else_val_list else "0"
 
-                dag.nodes[out] = DAGNode(
-                    name=out,
-                    node_type="primary_output",
-                    inputs=valid_deps,
-                    eval_fn=make_pwm_mux_eval(out),
-                    level=2,
-                    raw_expr=f"MUX({out})"
-                )
+            # Collect dependent inputs from conditions and expressions
+            dep_inputs: List[str] = []
+            for cond, expr in v_rules:
+                for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", cond):
+                    if (token in dag.nodes or token in dag.primary_inputs) and token not in dep_inputs:
+                        dep_inputs.append(token)
+                for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expr):
+                    if (token in dag.nodes or token in dag.primary_inputs) and token not in dep_inputs:
+                        dep_inputs.append(token)
+            for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", else_val):
+                if (token in dag.nodes or token in dag.primary_inputs) and token not in dep_inputs:
+                    dep_inputs.append(token)
+
+            def make_branch_eval(rules: List[Tuple[str, str]], fallback: str):
+                def _eval_token(tok: str, inp: Dict[str, int]) -> int:
+                    if tok in ("1'b1", "1", "1'd1"):
+                        return 1
+                    if tok in ("1'b0", "0", "1'd0"):
+                        return 0
+                    return inp.get(tok, 0)
+
+                def _eval(inp: Dict[str, int]) -> int:
+                    for c_expr, v_expr in rules:
+                        if _eval_token(c_expr, inp):
+                            return _eval_token(v_expr, inp)
+                    return _eval_token(fallback, inp)
+                return _eval
+
+            dag.nodes[out] = DAGNode(
+                name=out,
+                node_type="primary_output" if out in dag.primary_outputs else "intermediate",
+                inputs=dep_inputs,
+                eval_fn=make_branch_eval(v_rules, else_val),
+                level=2,
+                raw_expr=f"MUX({out})"
+            )
 
     def _compute_topological_order(self, dag: SlicedDAG):
         """Orders nodes topologically so dependencies are evaluated first."""

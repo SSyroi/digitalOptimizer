@@ -221,7 +221,7 @@
       "cell_type": "AND2",
       "connections": {
         "A": "dac_reg[1]",
-        "B": "state[0]",
+        "B": "state[1]",
         "Y": "n_5_and2"
       },
       "level": 4,
@@ -233,7 +233,7 @@
       "cell_type": "AND2",
       "connections": {
         "A": "dac_reg[1]",
-        "B": "state[1]",
+        "B": "state[0]",
         "Y": "n_6_and2"
       },
       "level": 4,
@@ -256,7 +256,7 @@
       "name": "U_COMB_8_n_8_inv_INV",
       "cell_type": "INV",
       "connections": {
-        "A": "comp_out",
+        "A": "state[2]",
         "Y": "n_8_inv"
       },
       "level": 4,
@@ -268,8 +268,8 @@
       "cell_type": "AND3",
       "connections": {
         "A": "n_8_inv",
-        "B": "dac_reg[1]",
-        "C": "state[2]",
+        "B": "state[1]",
+        "C": "state[0]",
         "Y": "n_8_and3"
       },
       "level": 3,
@@ -292,7 +292,7 @@
       "name": "U_COMB_11_n_11_inv_INV",
       "cell_type": "INV",
       "connections": {
-        "A": "state[2]",
+        "A": "comp_out",
         "Y": "n_11_inv"
       },
       "level": 3,
@@ -304,8 +304,8 @@
       "cell_type": "AND3",
       "connections": {
         "A": "n_11_inv",
-        "B": "state[1]",
-        "C": "state[0]",
+        "B": "dac_reg[1]",
+        "C": "state[2]",
         "Y": "n_11_and3"
       },
       "level": 2,
@@ -438,7 +438,7 @@
       "cell_type": "AND2",
       "connections": {
         "A": "dac_reg[3]",
-        "B": "state[0]",
+        "B": "state[2]",
         "Y": "n_23_and2"
       },
       "level": 4,
@@ -446,24 +446,23 @@
       "transistors": 6
     },
     {
-      "name": "U_COMB_24_n_24_and3_AND3",
-      "cell_type": "AND3",
+      "name": "U_COMB_24_n_24_and2_AND2",
+      "cell_type": "AND2",
       "connections": {
-        "A": "n_24_inv",
-        "B": "n_24_inv",
-        "C": "state[0]",
-        "Y": "n_24_and3"
+        "A": "dac_reg[3]",
+        "B": "state[0]",
+        "Y": "n_24_and2"
       },
       "level": 4,
-      "inverter_equivalent_ge": 4.0,
-      "transistors": 8
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
     },
     {
       "name": "U_COMB_25_n_23_or2_OR2",
       "cell_type": "OR2",
       "connections": {
         "A": "n_23_and2",
-        "B": "n_24_and3",
+        "B": "n_24_and2",
         "Y": "n_23_or2"
       },
       "level": 3,
@@ -496,23 +495,24 @@
       "transistors": 6
     },
     {
-      "name": "U_COMB_28_n_28_and2_AND2",
-      "cell_type": "AND2",
+      "name": "U_COMB_28_n_28_and3_AND3",
+      "cell_type": "AND3",
       "connections": {
-        "A": "dac_reg[3]",
-        "B": "state[2]",
-        "Y": "n_28_and2"
+        "A": "n_28_inv",
+        "B": "n_28_inv",
+        "C": "state[0]",
+        "Y": "n_28_and3"
       },
       "level": 2,
-      "inverter_equivalent_ge": 3.0,
-      "transistors": 6
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
     },
     {
       "name": "U_COMB_29_dac_reg_3_d_OR2",
       "cell_type": "OR2",
       "connections": {
         "A": "n_23_or2",
-        "B": "n_28_and2",
+        "B": "n_28_and3",
         "Y": "dac_reg[3]_d"
       },
       "level": 1,
