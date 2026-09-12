@@ -20,6 +20,13 @@ dependencies = [
 
 [project.scripts]
 ams-opt = "ams_optimizer.cli:main"
+v2-opt = "v2_sim_truth_table.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["ams_optimizer*"]
+include = ["ams_optimizer*", "v2_sim_truth_table*", "v1_ast_pipeline*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--ignore=v1_ast_pipeline"
+

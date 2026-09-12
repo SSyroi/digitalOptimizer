@@ -2,29 +2,44 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/status-active-brightgreen.svg" alt="Status">
-  <img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg" alt="Python Version">
+  <img src="https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue.svg" alt="Python Version">
   <img src="https://img.shields.io/badge/EDA-Cadence%20Virtuoso%20%7C%20Spectre-orange.svg" alt="EDA Compatible">
-  <img src="https://img.shields.io/badge/tests-11%20passing-success.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/dependencies-zero%20for%20v2-green.svg" alt="Zero Dependencies">
+  <img src="https://img.shields.io/badge/tests-18%20passing-success.svg" alt="Tests">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
 </p>
 
 > **A specialized synthesis, logic minimization, and code generation engine for Analog and Mixed-Signal (AMS) IC blocks.**  
-> Transforms behavioral Verilog RTL into isolated Flip-Flops, simplified combinational CMOS gates (`NAND`, `NOR`, `MUX`, `AOI`), simulation-ready **Verilog-A** modules with analog gate functions, and **Cadence Virtuoso SKILL** schematic scripts.
+> Transforms behavioral Verilog RTL into isolated Flip-Flops, simplified combinational CMOS gates (`NAND`, `NOR`, `MUX`, `AOI`), and simulation-ready Cadence Spectre **Verilog-A** models.
+
+---
+
+## 📂 Repository Structure & Engines
+
+The repository provides two distinct synthesis pipelines:
+
+1. **`v2_sim_truth_table/` (Simulation-Driven Truth Table Engine - Recommended for Python 3.9 & zero-pip environments)**
+   - **Zero External Dependencies**: Runs entirely on stock Python 3.9+ standard library (`argparse`, `itertools`, `dataclasses`, `re`).
+   - **Exhaustive Simulation**: Slices RTL into pseudo-inputs $(X, Q)$ and outputs $(D, Y)$, compiles RTL to Python, and simulates all $2^N$ states.
+   - **Truth-Table Minimization**: Pure-Python Quine-McCluskey + Petrick's exact set cover with active support-set pruning.
+   - **Spectre Verilog-A Emitter**: Generates 100% Cadence Spectre-compliant Verilog-A with `analog begin`, `@(initial_step)`, `@(cross)` clock sampling, and transition contributions for all outputs.
+
+2. **`v1_ast_pipeline/` (AST & Symbolic Pipeline with Web GUI & Virtuoso SKILL)**
+   - **Symbolic Parser & Logic Simplification**: Uses SymPy and AST tree manipulation.
+   - **Cadence Virtuoso Automation**: Emits SKILL scripts (`.il`), CDL/SPICE netlists, and SAT formal verification.
+   - **Web Dashboard**: Interactive FastAPI + HTML5 GUI for live browser editing.
 
 ---
 
 ## 📖 Table of Contents
+- [Quick Start: v2 Simulation-Driven Engine (Zero-Pip)](#-quick-start-v2-simulation-driven-engine-zero-pip)
+- [Quick Start: v1 AST & Full GUI Pipeline](#-quick-start-v1-ast--full-gui-pipeline)
 - [Why AMS Digital Optimizer?](#-why-ams-digital-optimizer)
 - [Architecture & Pipeline](#-architecture--pipeline)
-- [Key Features](#-key-features)
-- [Installation](#-installation)
-- [Quick Start CLI](#-quick-start-cli)
-- [Interactive Web Dashboard](#-interactive-web-dashboard)
-- [Custom Cell Library Specification](#-custom-cell-library-specification)
-- [Cadence Virtuoso Workflow](#-cadence-virtuoso-workflow)
-- [Comprehensive Documentation](#-comprehensive-documentation)
+- [Cadence Virtuoso & Spectre Workflow](#-cadence-virtuoso--spectre-workflow)
 - [Running Tests](#-running-tests)
 - [License](#-license)
+
 
 ---
 
@@ -97,24 +112,38 @@ pip install -e .
 
 ---
 
-## 🚀 Quick Start CLI
+## 🚀 Quick Start: v2 Simulation-Driven Engine (Zero-Pip)
+
+The V2 engine is written entirely with Python standard library and works out-of-the-box on Python 3.9+ without installing anything.
 
 ```bash
-# 1. Synthesize a 4-bit SAR ADC controller to Verilog-A
-ams-opt examples/sar_adc_ctrl.v -o sar_adc_ctrl_va.va
+# Direct execution (Zero install needed, pure Python 3.9)
+python3 v2_sim_truth_table/cli.py examples/gray_counter.v -o examples/gray_counter_v2.va
 
-# 2. Generate all deliverables (Verilog-A, Cadence SKILL script, SPICE netlist, BOM report)
+# Or via installed console script (after pip install -e .)
+v2-opt examples/sar_adc_ctrl.v -o examples/sar_adc_ctrl_v2.va --vdd 1.8 --vth 0.9 --save-report sar_adc_bom.md
+```
+
+---
+
+## 🖥️ Quick Start: v1 AST & Full GUI Pipeline
+
+```bash
+# Install dependencies (requires SymPy, FastAPI, Rich)
+pip install -e .
+
+# CLI: Synthesize Verilog-A, Cadence SKILL, SPICE netlist & BOM
 ams-opt examples/sar_adc_ctrl.v \
   -o sar_adc_ctrl_va.va \
   --save-skill sar_adc_schematic.il \
   --save-spice sar_adc.sp \
-  --save-report sar_adc_bom.md \
-  --vdd 1.8 \
-  --vth 0.9
+  --save-report sar_adc_bom.md
 
-# 3. Formally verify without emitting files
-ams-opt examples/gray_counter.v --verify-only
+# Web Dashboard:
+uvicorn ams_optimizer.web.app:app --reload --port 8000
 ```
+Open `http://localhost:8000` in your browser.
+
 
 ---
 
@@ -194,12 +223,15 @@ For full architectural deep-dives, algorithm details, De Morgan tech mapping the
 ---
 
 ## 🧪 Running Tests
-
-Run the full pytest suite:
-
+ 
 ```bash
+# Run with Python standard library (no pip dependencies required)
+PYTHONPATH=. python3 -m unittest tests/test_v2_sim_optimizer.py
+
+# Or run complete test suite (with pytest or venv active)
 pytest tests/
 ```
+
 
 ---
 

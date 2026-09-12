@@ -1,0 +1,215 @@
+name: "default_ams"
+description: "Standard Analog & Mixed-Signal CMOS Gate Library"
+supply_voltage: 1.8
+threshold_voltage: 0.9
+
+cells:
+  INV:
+    type: "combinational"
+    inputs: ["A"]
+    output: "Y"
+    function: "~A"
+    cost: 2 # transistor count / relative area
+    veriloga_func: |
+      analog function real INV;
+        input a; real a;
+        INV = (a > vth) ? 0.0 : 1.0;
+      endfunction
+
+  NAND2:
+    type: "combinational"
+    inputs: ["A", "B"]
+    output: "Y"
+    function: "~(A & B)"
+    cost: 4
+    veriloga_func: |
+      analog function real NAND2;
+        input a, b; real a, b;
+        NAND2 = !( (a > vth) && (b > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  NAND3:
+    type: "combinational"
+    inputs: ["A", "B", "C"]
+    output: "Y"
+    function: "~(A & B & C)"
+    cost: 6
+    veriloga_func: |
+      analog function real NAND3;
+        input a, b, c; real a, b, c;
+        NAND3 = !( (a > vth) && (b > vth) && (c > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  NAND4:
+    type: "combinational"
+    inputs: ["A", "B", "C", "D"]
+    output: "Y"
+    function: "~(A & B & C & D)"
+    cost: 8
+    veriloga_func: |
+      analog function real NAND4;
+        input a, b, c, d; real a, b, c, d;
+        NAND4 = !( (a > vth) && (b > vth) && (c > vth) && (d > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  NOR2:
+    type: "combinational"
+    inputs: ["A", "B"]
+    output: "Y"
+    function: "~(A | B)"
+    cost: 4
+    veriloga_func: |
+      analog function real NOR2;
+        input a, b; real a, b;
+        NOR2 = !( (a > vth) || (b > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  NOR3:
+    type: "combinational"
+    inputs: ["A", "B", "C"]
+    output: "Y"
+    function: "~(A | B | C)"
+    cost: 6
+    veriloga_func: |
+      analog function real NOR3;
+        input a, b, c; real a, b, c;
+        NOR3 = !( (a > vth) || (b > vth) || (c > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  NOR4:
+    type: "combinational"
+    inputs: ["A", "B", "C", "D"]
+    output: "Y"
+    function: "~(A | B | C | D)"
+    cost: 8
+    veriloga_func: |
+      analog function real NOR4;
+        input a, b, c, d; real a, b, c, d;
+        NOR4 = !( (a > vth) || (b > vth) || (c > vth) || (d > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  AND2:
+    type: "combinational"
+    inputs: ["A", "B"]
+    output: "Y"
+    function: "A & B"
+    cost: 6
+    veriloga_func: |
+      analog function real AND2;
+        input a, b; real a, b;
+        AND2 = ( (a > vth) && (b > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  AND3:
+    type: "combinational"
+    inputs: ["A", "B", "C"]
+    output: "Y"
+    function: "A & B & C"
+    cost: 8
+    veriloga_func: |
+      analog function real AND3;
+        input a, b, c; real a, b, c;
+        AND3 = ( (a > vth) && (b > vth) && (c > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  OR2:
+    type: "combinational"
+    inputs: ["A", "B"]
+    output: "Y"
+    function: "A | B"
+    cost: 6
+    veriloga_func: |
+      analog function real OR2;
+        input a, b; real a, b;
+        OR2 = ( (a > vth) || (b > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  OR3:
+    type: "combinational"
+    inputs: ["A", "B", "C"]
+    output: "Y"
+    function: "A | B | C"
+    cost: 8
+    veriloga_func: |
+      analog function real OR3;
+        input a, b, c; real a, b, c;
+        OR3 = ( (a > vth) || (b > vth) || (c > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  XOR2:
+    type: "combinational"
+    inputs: ["A", "B"]
+    output: "Y"
+    function: "A ^ B"
+    cost: 8
+    veriloga_func: |
+      analog function real XOR2;
+        input a, b; real a, b;
+        XOR2 = ( ((a > vth) ? 1 : 0) ^ ((b > vth) ? 1 : 0) ) ? 1.0 : 0.0;
+      endfunction
+
+  XNOR2:
+    type: "combinational"
+    inputs: ["A", "B"]
+    output: "Y"
+    function: "~(A ^ B)"
+    cost: 8
+    veriloga_func: |
+      analog function real XNOR2;
+        input a, b; real a, b;
+        XNOR2 = ( ((a > vth) ? 1 : 0) ^ ((b > vth) ? 1 : 0) ) ? 0.0 : 1.0;
+      endfunction
+
+  MUX2:
+    type: "combinational"
+    inputs: ["S", "D0", "D1"]
+    output: "Y"
+    function: "(~S & D0) | (S & D1)"
+    cost: 8
+    veriloga_func: |
+      analog function real MUX2;
+        input s, d0, d1; real s, d0, d1;
+        MUX2 = (s > vth) ? ((d1 > vth) ? 1.0 : 0.0) : ((d0 > vth) ? 1.0 : 0.0);
+      endfunction
+
+  AOI21:
+    type: "combinational"
+    inputs: ["A1", "A2", "B1"]
+    output: "Y"
+    function: "~((A1 & A2) | B1)"
+    cost: 6
+    veriloga_func: |
+      analog function real AOI21;
+        input a1, a2, b1; real a1, a2, b1;
+        AOI21 = !( ((a1 > vth) && (a2 > vth)) || (b1 > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  OAI21:
+    type: "combinational"
+    inputs: ["A1", "A2", "B1"]
+    output: "Y"
+    function: "~((A1 | A2) & B1)"
+    cost: 6
+    veriloga_func: |
+      analog function real OAI21;
+        input a1, a2, b1; real a1, a2, b1;
+        OAI21 = !( ((a1 > vth) || (a2 > vth)) && (b1 > vth) ) ? 1.0 : 0.0;
+      endfunction
+
+  DFF:
+    type: "sequential"
+    inputs: ["CLK", "D"]
+    outputs: ["Q", "QN"]
+    cost: 16
+
+  DFFR:
+    type: "sequential"
+    inputs: ["CLK", "D", "RST_N"]
+    outputs: ["Q", "QN"]
+    cost: 18
+
+  DFFRE:
+    type: "sequential"
+    inputs: ["CLK", "D", "RST_N", "ENA"]
+    outputs: ["Q", "QN"]
+    cost: 22
