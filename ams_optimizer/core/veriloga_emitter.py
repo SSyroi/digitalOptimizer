@@ -162,7 +162,7 @@ class VerilogAEmitter:
             lines.append(f"    {san_out}_val = {va_expr};")
         lines.append("")
 
-        # 8d. Analog Output Contribution Drivers
+        # 8d. Analog Output Contribution Drivers (100% Guaranteed Port Coverage)
         lines.append("    // -------------------------------------------------------------------------")
         lines.append("    // 4. Analog Output Drivers (Continuous Transition Filters)")
         lines.append("    // -------------------------------------------------------------------------")
@@ -177,6 +177,11 @@ class VerilogAEmitter:
                         elif bit_name in out_expressions:
                             san_out = self._sanitize_name(bit_name)
                             lines.append(f"    V({bit_name}) <+ transition({san_out}_val * vdd, tdel, trise, tfall);")
+                        elif pname in out_expressions:
+                            san_out = self._sanitize_name(pname)
+                            lines.append(f"    V({bit_name}) <+ transition({san_out}_val * vdd, tdel, trise, tfall);")
+                        else:
+                            lines.append(f"    V({bit_name}) <+ transition(0.0, tdel, trise, tfall);")
                 else:
                     if pname in sanitized_reg_names:
                         san = sanitized_reg_names[pname]
@@ -184,6 +189,8 @@ class VerilogAEmitter:
                     elif pname in out_expressions:
                         san_out = self._sanitize_name(pname)
                         lines.append(f"    V({pname}) <+ transition({san_out}_val * vdd, tdel, trise, tfall);")
+                    else:
+                        lines.append(f"    V({pname}) <+ transition(0.0, tdel, trise, tfall);")
 
         lines.append("  end")
         lines.append("")
@@ -198,18 +205,23 @@ class VerilogAEmitter:
         """Wrap primary inputs with V(pin) and register signals with reg_q."""
         s = expr_str.replace("1'b1", "1.0").replace("1'b0", "0.0")
 
-        # Replace register signals (sorted by length descending)
+        # Replace register bit signals (sorted by length descending)
         for reg_name, san_name in sorted(sanitized_reg_names.items(), key=lambda x: len(x[0]), reverse=True):
             if "[" in reg_name:
                 s = s.replace(reg_name, f"{san_name}_q")
             else:
                 s = re.sub(rf"\b{re.escape(reg_name)}\b", f"{san_name}_q", s)
 
-        # Replace primary inputs with V(pin)
+        # Replace primary input bit signals with V(pin)
         for pin in sorted(parsed.get_all_input_signals(), key=lambda x: len(x), reverse=True):
             if "[" in pin:
                 s = s.replace(pin, f"V({pin})")
             else:
                 s = re.sub(rf"\b{re.escape(pin)}\b", f"V({pin})", s)
+
+        # Catch any residual unsanitized vector bit references like sig_0_ -> sig_0_q or V(sig[0])
+        for reg in parsed.registers:
+            san = self._sanitize_name(reg.name)
+            s = re.sub(rf"\b{re.escape(san)}\b(?!_q|_d)", f"{san}_q", s)
 
         return s

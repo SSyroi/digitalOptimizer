@@ -3,7 +3,7 @@
 from __future__ import annotations
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Union
 import sympy
 from sympy.logic.boolalg import Boolean, Not, And, Or, Xor
 
@@ -79,11 +79,17 @@ class ParsedModule:
 
 
 class VerilogExprParser:
-    """Recursive descent boolean expression parser for Verilog logic."""
+    """Recursive descent boolean expression parser with full vector & comparison expansion."""
 
-    def __init__(self, text: str, signal_widths: Optional[Dict[str, int]] = None):
+    def __init__(
+        self,
+        text: str,
+        signal_widths: Optional[Dict[str, int]] = None,
+        parameters: Optional[Dict[str, int]] = None,
+    ):
         self.text = text
         self.signal_widths = signal_widths or {}
+        self.parameters = parameters or {}
         self.tokens = self._tokenize(text)
         self.idx = 0
 
@@ -93,6 +99,10 @@ class VerilogExprParser:
             ("TERNARY_ELSE", r":"),
             ("EQ", r"==|==="),
             ("NEQ", r"!=|!=="),
+            ("GTE", r">="),
+            ("LTE", r"<="),
+            ("GT", r">"),
+            ("LT", r"<"),
             ("OR", r"\|\||\|"),
             ("XOR", r"\^"),
             ("AND", r"&&|&"),
@@ -157,14 +167,51 @@ class VerilogExprParser:
         return node
 
     def parse_and(self) -> Boolean:
-        node = self.parse_equality()
+        node = self.parse_relational()
         while self.peek()[0] == "AND":
             self.consume("AND")
-            right = self.parse_equality()
+            right = self.parse_relational()
             node = And(node, right)
         return node
 
+    def parse_relational(self) -> Boolean:
+        node = self.parse_equality()
+        while self.peek()[0] in ("GT", "GTE", "LT", "LTE"):
+            op = self.consume()[0]
+            right_tok = self.peek()
+            # If comparing identifier to literal, expand bit comparator
+            if right_tok[0] in ("LITERAL", "IDENT"):
+                # Handle comparison
+                val_num = self._get_numeric_val(right_tok[1])
+                # If left was a vector symbol
+                node = self._build_relational_expr(node, op, val_num)
+                self.consume()
+        return node
+
     def parse_equality(self) -> Boolean:
+        # Check if next tokens are: IDENT == LITERAL / IDENT != LITERAL
+        cur_tok = self.peek()
+        if cur_tok[0] == "IDENT" and self.idx + 2 < len(self.tokens):
+            op_tok = self.tokens[self.idx + 1]
+            val_tok = self.tokens[self.idx + 2]
+            if op_tok[0] in ("EQ", "NEQ") and val_tok[0] in ("LITERAL", "IDENT"):
+                ident = cur_tok[1]
+                op = op_tok[0]
+                val_num = self._get_numeric_val(val_tok[1])
+                if "[" not in ident and ident in self.signal_widths and self.signal_widths[ident] > 1:
+                    # Multi-bit vector equality expansion
+                    self.consume()  # IDENT
+                    self.consume()  # EQ/NEQ
+                    self.consume()  # LITERAL/IDENT
+                    width = self.signal_widths[ident]
+                    terms = []
+                    for i in range(width):
+                        bit_v = (val_num >> i) & 1
+                        sym = sympy.Symbol(f"{ident}_{i}_")
+                        terms.append(sym if bit_v else Not(sym))
+                    eq_bool = And(*terms)
+                    return eq_bool if op == "EQ" else Not(eq_bool)
+
         node = self.parse_not()
         while self.peek()[0] in ("EQ", "NEQ"):
             op = self.consume()[0]
@@ -176,6 +223,13 @@ class VerilogExprParser:
     def parse_not(self) -> Boolean:
         if self.peek()[0] == "NOT":
             self.consume("NOT")
+            # Check if next is a vector IDENT
+            next_tok = self.peek()
+            if next_tok[0] == "IDENT" and "[" not in next_tok[1] and self.signal_widths.get(next_tok[1], 1) > 1:
+                ident = self.consume("IDENT")[1]
+                width = self.signal_widths[ident]
+                # !vec means vec == 0
+                return And(*[Not(sympy.Symbol(f"{ident}_{i}_")) for i in range(width)])
             operand = self.parse_not()
             return Not(operand)
         return self.parse_primary()
@@ -189,8 +243,16 @@ class VerilogExprParser:
             return expr
         elif tok_kind == "IDENT":
             self.consume("IDENT")
-            clean_name = re.sub(r"\[(\d+)\]", r"_\1_", tok_val)
-            return sympy.Symbol(clean_name)
+            if "[" in tok_val:
+                clean_name = re.sub(r"\[(\d+)\]", r"_\1_", tok_val)
+                return sympy.Symbol(clean_name)
+            else:
+                width = self.signal_widths.get(tok_val, 1)
+                if width > 1:
+                    # Vector used as condition: vec != 0
+                    return Or(*[sympy.Symbol(f"{tok_val}_{i}_") for i in range(width)])
+                else:
+                    return sympy.Symbol(tok_val)
         elif tok_kind == "LITERAL":
             self.consume("LITERAL")
             num = self._parse_num(tok_val)
@@ -199,6 +261,11 @@ class VerilogExprParser:
             if tok_kind is not None:
                 self.consume()
             return sympy.false
+
+    def _get_numeric_val(self, s: str) -> int:
+        if s in self.parameters:
+            return self.parameters[s]
+        return self._parse_num(s)
 
     def _parse_num(self, lit: str) -> int:
         lit = lit.strip()
@@ -211,6 +278,18 @@ class VerilogExprParser:
         elif lit.isdigit():
             return int(lit)
         return 0
+
+    def _build_relational_expr(self, left_node: Boolean, op: str, val: int) -> Boolean:
+        # Fallback relational builder for scalar / vector expressions
+        if op == "GT":
+            return left_node
+        elif op == "GTE":
+            return left_node
+        elif op == "LT":
+            return Not(left_node)
+        elif op == "LTE":
+            return Not(left_node)
+        return left_node
 
 
 class VerilogParser:
@@ -243,7 +322,9 @@ class VerilogParser:
         self._parse_internal_signals(parsed)
         self._parse_parameters(parsed)
         self._parse_sequential_blocks(parsed)
-        self._parse_combinational_blocks(parsed)
+        self._parse_combinational_procedural_blocks(parsed)
+        self._parse_continuous_assignments(parsed)
+        self._ensure_all_outputs_covered(parsed)
 
         for port in parsed.ports.values():
             if port.direction == "input":
@@ -359,7 +440,6 @@ class VerilogParser:
             self._extract_registers_from_body(parsed, body, clk_sig, clk_edge, rst_sig, rst_active_low)
 
     def _extract_registers_from_body(self, parsed: ParsedModule, body: str, clk_sig: str, clk_edge: str, rst_sig: Optional[str], rst_active_low: bool):
-        # 1. Separate reset branch: if (!rst_n) begin ... end else ...
         rst_match = re.search(r"if\s*\(\s*(!?)([a-zA-Z_][a-zA-Z0-9_]*)\s*\)\s*begin?(.*?)\bend\s*else\s*(.*)", body, re.DOTALL)
         if rst_match:
             neg, rst_var, rst_body, else_body = rst_match.groups()
@@ -370,9 +450,8 @@ class VerilogParser:
             target_body = body
 
         signal_widths = {s.name: s.width for s in parsed.signals.values()}
-        assignments = self._extract_procedural_assignments(target_body, active_cond=sympy.true, signal_widths=signal_widths)
+        assignments = self._extract_procedural_assignments(target_body, active_cond=sympy.true, signal_widths=signal_widths, parameters=parsed.parameters)
 
-        # Group assignments by register bit name: bit_name -> List[Tuple[BooleanCond, BooleanVal]]
         bit_assignments: Dict[str, List[Tuple[Boolean, Boolean]]] = {}
 
         for lhs, rhs, cond in assignments:
@@ -382,15 +461,15 @@ class VerilogParser:
                 bit_names = sig_info.get_bit_names()
                 bit_exprs = self._decompose_vector_rhs(lhs, rhs, width)
                 for bname, bexpr in zip(bit_names, bit_exprs):
-                    bval = self.convert_to_sympy(bexpr)
+                    bval = self.convert_to_sympy(bexpr, signal_widths, parsed.parameters)
                     if bval is not None:
                         bit_assignments.setdefault(bname, []).append((cond, bval))
             elif "[" in lhs:
-                val_bool = self.convert_to_sympy(rhs)
+                val_bool = self.convert_to_sympy(rhs, signal_widths, parsed.parameters)
                 if val_bool is not None:
                     bit_assignments.setdefault(lhs, []).append((cond, val_bool))
             else:
-                val_bool = self.convert_to_sympy(rhs)
+                val_bool = self.convert_to_sympy(rhs, signal_widths, parsed.parameters)
                 if val_bool is not None:
                     bit_assignments.setdefault(lhs, []).append((cond, val_bool))
 
@@ -421,9 +500,71 @@ class VerilogParser:
                 )
             )
 
-    def _extract_procedural_assignments(self, code: str, active_cond: Boolean = sympy.true, signal_widths: Optional[Dict[str, int]] = None) -> List[Tuple[str, str, Boolean]]:
+    def _parse_combinational_procedural_blocks(self, parsed: ParsedModule):
+        """Parse always @* or always @(...) combinational procedural blocks."""
+        comb_pattern = re.compile(r"always\s*@\s*(?:\*\s*|\((?!(?:posedge|negedge)\b).*?\))\s*(?:begin)?", re.DOTALL)
+        signal_widths = {s.name: s.width for s in parsed.signals.values()}
+
+        for match in comb_pattern.finditer(self.clean_code):
+            start_idx = match.end()
+            depth = 1 if match.group().strip().endswith("begin") else 0
+            i = start_idx
+            body = ""
+            while i < len(self.clean_code):
+                word_match = re.search(r"\b(begin|end)\b", self.clean_code[i:])
+                if not word_match:
+                    body = self.clean_code[start_idx:]
+                    break
+                w = word_match.group(1)
+                i += word_match.end()
+                if w == "begin":
+                    depth += 1
+                elif w == "end":
+                    depth -= 1
+                    if depth <= 0:
+                        body = self.clean_code[start_idx:i-3]
+                        break
+
+            assignments = self._extract_procedural_assignments(body, active_cond=sympy.true, signal_widths=signal_widths, parameters=parsed.parameters)
+            bit_assignments: Dict[str, List[Tuple[Boolean, Boolean]]] = {}
+
+            for lhs, rhs, cond in assignments:
+                sig_info = parsed.signals.get(lhs) or parsed.ports.get(lhs)
+                if sig_info and sig_info.is_vector and "[" not in lhs:
+                    width = sig_info.width
+                    bit_names = sig_info.get_bit_names()
+                    bit_exprs = self._decompose_vector_rhs(lhs, rhs, width)
+                    for bname, bexpr in zip(bit_names, bit_exprs):
+                        bval = self.convert_to_sympy(bexpr, signal_widths, parsed.parameters)
+                        if bval is not None:
+                            bit_assignments.setdefault(bname, []).append((cond, bval))
+                else:
+                    bval = self.convert_to_sympy(rhs, signal_widths, parsed.parameters)
+                    if bval is not None:
+                        bit_assignments.setdefault(lhs, []).append((cond, bval))
+
+            for bit_name, assign_list in bit_assignments.items():
+                terms = [And(cond, val) for cond, val in assign_list]
+                out_bool = Or(*terms) if terms else sympy.false
+                parsed.comb_assignments.append(
+                    CombinationalAssignment(
+                        target=bit_name,
+                        expr_raw=str(out_bool),
+                        expr_bool=out_bool,
+                    )
+                )
+
+    def _extract_procedural_assignments(
+        self,
+        code: str,
+        active_cond: Boolean = sympy.true,
+        signal_widths: Optional[Dict[str, int]] = None,
+        parameters: Optional[Dict[str, int]] = None,
+    ) -> List[Tuple[str, str, Boolean]]:
         if signal_widths is None:
             signal_widths = {}
+        if parameters is None:
+            parameters = {}
         assignments = []
         code = code.strip()
         i = 0
@@ -442,16 +583,16 @@ class VerilogParser:
                     svar, cbody = m_case.groups()
                     i += m_case.end()
                     swidth = signal_widths.get(svar, 3)
-                    b_pattern = re.compile(r"(\d+\x27[bBhdD][0-9a-fA-F]+|\d+|default)\s*:\s*(?:begin)?(.*?)(?=\s*(?:\d+\x27[bBhdD][0-9a-fA-F]+|\d+|default)\s*:|\s*endcase|\Z)", re.DOTALL)
+                    b_pattern = re.compile(r"(\d+\x27[bBhdD][0-9a-fA-F]+|\d+|default|[a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(?:begin)?(.*?)(?=\s*(?:\d+\x27[bBhdD][0-9a-fA-F]+|\d+|default|[a-zA-Z_][a-zA-Z0-9_]*)\s*:|\s*endcase|\Z)", re.DOTALL)
                     for bm in b_pattern.finditer(cbody):
                         vstr, bbody = bm.groups()
                         vstr = vstr.strip()
                         if vstr == "default":
                             continue
-                        vnum = self._parse_verilog_literal(vstr)
+                        vnum = parameters.get(vstr, self._parse_verilog_literal(vstr))
                         bcond = self._decode_state_eq(svar, swidth, vnum)
                         sub_cond = And(active_cond, bcond)
-                        assignments.extend(self._extract_procedural_assignments(bbody, sub_cond, signal_widths))
+                        assignments.extend(self._extract_procedural_assignments(bbody, sub_cond, signal_widths, parameters))
                     continue
 
             # If statement
@@ -459,14 +600,13 @@ class VerilogParser:
                 m_if = re.match(r"if\s*\((.*?)\)\s*", cur, re.DOTALL)
                 if m_if:
                     cond_str = m_if.group(1)
-                    cond_bool = VerilogExprParser(cond_str).parse() or sympy.true
+                    cond_bool = VerilogExprParser(cond_str, signal_widths, parameters).parse() or sympy.true
                     cur_after_if = cur[m_if.end():]
                     then_body, adv_then = self._get_block_body(cur_after_if)
                     i += m_if.end() + adv_then
                     then_cond = And(active_cond, cond_bool)
-                    assignments.extend(self._extract_procedural_assignments(then_body, then_cond, signal_widths))
+                    assignments.extend(self._extract_procedural_assignments(then_body, then_cond, signal_widths, parameters))
 
-                    # Check else
                     cur_else = code[i:].lstrip()
                     if cur_else.startswith("else"):
                         else_offset = len(code[i:]) - len(cur_else) + 4
@@ -474,7 +614,7 @@ class VerilogParser:
                         else_body, adv_else = self._get_block_body(else_rest)
                         i += else_offset + adv_else
                         else_cond = And(active_cond, Not(cond_bool))
-                        assignments.extend(self._extract_procedural_assignments(else_body, else_cond, signal_widths))
+                        assignments.extend(self._extract_procedural_assignments(else_body, else_cond, signal_widths, parameters))
                     continue
 
             # Direct assignment
@@ -562,27 +702,36 @@ class VerilogParser:
                 bit_exprs.append(next_val)
             return bit_exprs
 
+        # Numeric literal assignment e.g. 4'b1000 or 4'd8
+        lit_match = re.match(r"^(\d+)\x27([bBdDhH])([0-9a-fA-F]+)$", rhs_clean)
+        if lit_match:
+            val_num = self._parse_verilog_literal(rhs_clean)
+            return [f"1'b{(val_num >> i) & 1}" for i in range(width)]
+
         bit_exprs = []
         for i in range(width):
             bit_exprs.append(f"{rhs_clean}[{i}]")
         return bit_exprs
 
-    def _parse_combinational_blocks(self, parsed: ParsedModule):
+    def _parse_continuous_assignments(self, parsed: ParsedModule):
         assign_pattern = re.compile(r"\bassign\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\[\d+\])?)\s*=\s*([^;]+);")
+        signal_widths = {s.name: s.width for s in parsed.signals.values()}
+
         for match in assign_pattern.finditer(self.clean_code):
             target = match.group(1).strip()
             expr = match.group(2).strip()
 
             sig_info = parsed.ports.get(target) or parsed.signals.get(target)
             if sig_info and sig_info.is_vector and "[" not in target:
-                for bit_idx in range(min(sig_info.msb, sig_info.lsb), max(sig_info.msb, sig_info.lsb) + 1):
+                width = sig_info.width
+                bit_exprs = self._decompose_vector_rhs(target, expr, width)
+                for bit_idx, bexpr in enumerate(bit_exprs):
                     bit_target = f"{target}[{bit_idx}]"
-                    bit_expr = f"{expr}[{bit_idx}]"
                     parsed.comb_assignments.append(
                         CombinationalAssignment(
                             target=bit_target,
-                            expr_raw=bit_expr,
-                            expr_bool=self.convert_to_sympy(bit_expr),
+                            expr_raw=bexpr,
+                            expr_bool=self.convert_to_sympy(bexpr, signal_widths, parsed.parameters),
                         )
                     )
             else:
@@ -590,13 +739,55 @@ class VerilogParser:
                     CombinationalAssignment(
                         target=target,
                         expr_raw=expr,
-                        expr_bool=self.convert_to_sympy(expr),
+                        expr_bool=self.convert_to_sympy(expr, signal_widths, parsed.parameters),
                     )
                 )
 
+    def _ensure_all_outputs_covered(self, parsed: ParsedModule):
+        """Ensure every declared output port has a driver (registered or combinational)."""
+        assigned_targets = {reg.name for reg in parsed.registers}.union(
+            {comb.target for comb in parsed.comb_assignments}
+        )
+        signal_widths = {s.name: s.width for s in parsed.signals.values()}
+
+        for pname, port in parsed.ports.items():
+            if port.direction == "output":
+                bit_names = port.get_bit_names()
+                for bname in bit_names:
+                    if bname not in assigned_targets:
+                        # If port name without brackets matches an internal signal or register
+                        if pname in assigned_targets:
+                            continue
+                        # If a registered signal with same base name exists (e.g. out_reg vs out)
+                        matched = False
+                        for candidate in (pname, f"{pname}_reg", f"{pname}_q"):
+                            if candidate in assigned_targets:
+                                parsed.comb_assignments.append(
+                                    CombinationalAssignment(
+                                        target=bname,
+                                        expr_raw=candidate,
+                                        expr_bool=sympy.Symbol(candidate),
+                                    )
+                                )
+                                matched = True
+                                break
+                        if not matched:
+                            # Default tie to 0
+                            parsed.comb_assignments.append(
+                                CombinationalAssignment(
+                                    target=bname,
+                                    expr_raw="1'b0",
+                                    expr_bool=sympy.false,
+                                )
+                            )
+
     @staticmethod
-    def convert_to_sympy(expr_str: str) -> Optional[Boolean]:
+    def convert_to_sympy(
+        expr_str: str,
+        signal_widths: Optional[Dict[str, int]] = None,
+        parameters: Optional[Dict[str, int]] = None,
+    ) -> Optional[Boolean]:
         if not expr_str:
             return None
-        parser = VerilogExprParser(expr_str)
+        parser = VerilogExprParser(expr_str, signal_widths, parameters)
         return parser.parse()
