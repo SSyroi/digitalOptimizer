@@ -74,19 +74,37 @@ class LogicSynthesizer:
             node = LogicNode(gate_type="WIRE", inputs=[target_name], output_name=target_name, cost=0)
             return SynthesizedCone(target=target_name, root=node, total_cost=0, gate_counts={})
 
-        # 1. Simplify boolean logic
+        # 1. Simplify boolean logic in both DNF (SOP) and CNF (POS) canonical forms
         try:
-            simplified = simplify_logic(sym_expr, form="dnf")
+            dnf_expr = simplify_logic(sym_expr, form="dnf")
         except Exception:
-            simplified = sym_expr
+            dnf_expr = sym_expr
 
-        # 2. Map boolean AST to library gates
-        root_node = self._map_ast_to_gates(simplified)
+        try:
+            cnf_expr = simplify_logic(sym_expr, form="cnf")
+        except Exception:
+            cnf_expr = sym_expr
+
+        # 2. Map both candidate ASTs to library gates and calculate exact transistor costs
+        node_dnf = self._map_ast_to_gates(dnf_expr)
+        gate_counts_dnf: Dict[str, int] = {}
+        cost_dnf = self._calc_stats(node_dnf, gate_counts_dnf)
+
+        node_cnf = self._map_ast_to_gates(cnf_expr)
+        gate_counts_cnf: Dict[str, int] = {}
+        cost_cnf = self._calc_stats(node_cnf, gate_counts_cnf)
+
+        # Pick the strictly minimal cost mapping
+        if cost_cnf < cost_dnf:
+            root_node = node_cnf
+            total_cost = cost_cnf
+            gate_counts = gate_counts_cnf
+        else:
+            root_node = node_dnf
+            total_cost = cost_dnf
+            gate_counts = gate_counts_dnf
+
         root_node.output_name = target_name
-
-        # 3. Calculate gate statistics
-        gate_counts: Dict[str, int] = {}
-        total_cost = self._calc_stats(root_node, gate_counts)
 
         return SynthesizedCone(
             target=target_name,
