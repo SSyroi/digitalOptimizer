@@ -22,6 +22,8 @@ def main():
     parser.add_argument("verilog_file", help="Path to input behavioral Verilog RTL file")
     parser.add_argument("-l", "--lib", help="Path to custom cell library YAML file (optional)")
     parser.add_argument("-o", "--output-va", help="Path to output Verilog-A file (.va)")
+    parser.add_argument("--vdd", type=float, help="Supply voltage in Volts (e.g. 1.8)")
+    parser.add_argument("--vth", type=float, help="Logic threshold voltage in Volts (e.g. 0.9)")
     parser.add_argument("--virtuoso-lib", default="MY_AMS_LIB", help="Target Cadence Virtuoso cell library name")
     parser.add_argument("--save-skill", help="Path to save Cadence Virtuoso SKILL .il script")
     parser.add_argument("--save-spice", help="Path to save CDL/SPICE netlist (.sp)")
@@ -44,6 +46,11 @@ def main():
         library = Library.load_from_yaml(args.lib)
     else:
         library = load_default_library()
+
+    if args.vdd is not None:
+        library.supply_voltage = args.vdd
+    if args.vth is not None:
+        library.threshold_voltage = args.vth
 
     console.print(Panel(
         f"[bold cyan]AMS Digital Optimizer & Synthesizer[/]\n"
