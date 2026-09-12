@@ -88,12 +88,17 @@ digitalOptimizer/
 │   ├── __init__.py
 │   ├── cli.py                 # Pure standard library CLI
 │   └── core/
-│       ├── dag_slicer.py       # Multi-level RTL slicer & intermediate node extractor
-│       ├── truth_table_eval.py # Local node truth-table evaluator & reachability analyzer
-│       ├── npn_mapper.py       # NPN matching, Shannon MUX extraction, Quine-McCluskey
-│       ├── veriloga_emitter.py # Cadence Spectre Verilog-A emitter
-│       ├── skill_emitter.py    # Cadence Virtuoso SKILL (.il) schematic generator
-│       └── optimizer.py        # Master synthesis coordinator
+│       ├── models.py          # Core dataclasses and transistor cost table
+│       ├── dag_slicer.py      # Multi-level RTL slicer & intermediate node extractor
+│       ├── reachability.py    # FSM state reachability analyzer (Don't-Cares)
+│       ├── truth_table.py     # Local node truth-table evaluator & variable pruner
+│       ├── shannon_mux.py     # Shannon decomposition for 6T MUX2 extraction
+│       ├── npn_matcher.py     # NPN bitmask matching (AOI21, XOR2, NAND, NOR)
+│       ├── quine_mccluskey.py # Pure-Python Quine-McCluskey / Petrick solver
+│       ├── tech_mapper.py     # Technology mapping & global inverter sharing
+│       ├── veriloga_emitter.py# Cadence Spectre Verilog-A emitter
+│       ├── skill_emitter.py   # Cadence Virtuoso SKILL (.il) schematic generator
+│       └── optimizer.py       # Master synthesis coordinator
 ├── examples/                  # Benchmark RTL & synthesized Verilog-A models
 │   ├── PWM_CTRL.v
 │   ├── PWM_CTRL_va.va
@@ -105,10 +110,12 @@ digitalOptimizer/
 │   ├── bandgap_trim_fsm_va.va
 │   ├── clock_divider_rst.v
 │   └── clock_divider_rst_va.va
-├── tests/                     # Zero-dependency unit & integration tests
-│   └── test_optimizer.py
+├── tests/                     # Zero-dependency unit & algorithm tests
+│   ├── test_optimizer.py
+│   └── test_algorithms.py
 ├── pyproject.toml
 └── README.md
+
 ```
 
 ---
