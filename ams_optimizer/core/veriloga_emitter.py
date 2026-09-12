@@ -11,8 +11,8 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Set
 
-from .dag_slicer import SlicedDAG, SlicedPort, SlicedRegister
-from .npn_mapper import MappedLogicNode
+from .models import SlicedDAG, SlicedPort, SlicedRegister, MappedLogicNode
+
 
 
 class VerilogAEmitter:

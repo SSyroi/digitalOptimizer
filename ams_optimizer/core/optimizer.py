@@ -11,24 +11,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-from .dag_slicer import VerilogDAGSlicer, SlicedDAG
-from .truth_table_eval import TruthTableEvaluator, LocalTruthTable
-from .npn_mapper import TechnologyMapper, MappedLogicNode, TRANSISTOR_COST
+from .models import SlicedDAG, LocalTruthTable, MappedLogicNode, OptimizationResult, TRANSISTOR_COST
+from .dag_slicer import VerilogDAGSlicer
+from .truth_table import LocalTruthTableEvaluator
+from .tech_mapper import TechnologyMapper
 from .veriloga_emitter import VerilogAEmitter
 from .skill_emitter import SKILLEmitter
-
-
-@dataclass
-class OptimizationResult:
-    module_name: str
-    dag: SlicedDAG
-    mapped_nodes: Dict[str, MappedLogicNode]
-    veriloga_code: str
-    skill_code: str
-    bom_report: str
-    gate_breakdown: Dict[str, int] = field(default_factory=dict)
-    total_gates: int = 0
-    total_transistors: int = 0
 
 
 class AMSOptimizer:
@@ -45,7 +33,8 @@ class AMSOptimizer:
         dag = slicer.parse()
 
         # Step 2: Local Truth Table Simulation & Reachability Analysis
-        evaluator = TruthTableEvaluator(dag)
+        evaluator = LocalTruthTableEvaluator(dag)
+
         local_tables: Dict[str, LocalTruthTable] = {}
         for node_name, node in dag.nodes.items():
             local_tables[node_name] = evaluator.evaluate_node(node)

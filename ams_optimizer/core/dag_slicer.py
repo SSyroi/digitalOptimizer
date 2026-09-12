@@ -9,67 +9,10 @@ Zero external dependencies. Compatible with Python 3.9+.
 
 from __future__ import annotations
 import re
-from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
+from .models import SlicedPort, SlicedRegister, DAGNode, SlicedDAG
 
-@dataclass
-class SlicedPort:
-    name: str
-    direction: str  # "input", "output", "inout"
-    width: int = 1
-    msb: int = 0
-    lsb: int = 0
-
-    @property
-    def bit_names(self) -> List[str]:
-        if self.width <= 1:
-            return [self.name]
-        step = -1 if self.msb >= self.lsb else 1
-        return [f"{self.name}[{i}]" for i in range(self.msb, self.lsb + step, step)]
-
-
-@dataclass
-class SlicedRegister:
-    name: str
-    width: int = 1
-    msb: int = 0
-    lsb: int = 0
-    clock_signal: str = "clk"
-    reset_signal: str = "rst_n"
-    reset_val: int = 0
-    is_async_reset: bool = True
-    is_active_low_reset: bool = True
-
-    @property
-    def bit_names(self) -> List[str]:
-        if self.width <= 1:
-            return [self.name]
-        step = -1 if self.msb >= self.lsb else 1
-        return [f"{self.name}[{i}]" for i in range(self.msb, self.lsb + step, step)]
-
-
-@dataclass
-class DAGNode:
-    name: str  # e.g. "is_az_mode", "cnt_0_d", "en_LP"
-    node_type: str  # "intermediate", "register_d", "primary_output"
-    inputs: List[str]  # names of nets this node depends on
-    eval_fn: Callable[[Dict[str, int]], int]
-    level: int = 0
-    raw_expr: str = ""
-
-
-@dataclass
-class SlicedDAG:
-    module_name: str
-    ports: Dict[str, SlicedPort] = field(default_factory=dict)
-    registers: Dict[str, SlicedRegister] = field(default_factory=dict)
-    nodes: Dict[str, DAGNode] = field(default_factory=dict)
-    topo_order: List[str] = field(default_factory=list)
-    primary_inputs: List[str] = field(default_factory=list)
-    primary_outputs: List[str] = field(default_factory=list)
-    register_q_bits: List[str] = field(default_factory=list)
-    register_d_bits: List[str] = field(default_factory=list)
 
 
 def _strip_comments(code: str) -> str:

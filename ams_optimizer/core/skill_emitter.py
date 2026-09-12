@@ -10,8 +10,8 @@ Zero external dependencies. Compatible with Python 3.9+.
 from __future__ import annotations
 from typing import Dict, List
 
-from .dag_slicer import SlicedDAG
-from .npn_mapper import MappedLogicNode
+from .models import SlicedDAG, MappedLogicNode
+
 
 
 class SKILLEmitter:
