@@ -31,19 +31,19 @@ class VerilogAEmitter:
         self,
         dag: SlicedDAG,
         mapped_nodes: Dict[str, MappedLogicNode],
-        gate_breakdown: Dict[str, int],
+        gate_breakdown: Optional[Dict[str, int]] = None,
         supply_voltage: float = 1.8,
         threshold_voltage: float = 0.9,
     ):
         self.dag = dag
         self.mapped_nodes = mapped_nodes
-        self.gate_breakdown = gate_breakdown
+        self.gate_breakdown = gate_breakdown or {}
         self.supply_voltage = supply_voltage
         self.threshold_voltage = threshold_voltage
 
-        self.total_gates = sum(gate_breakdown.values())
-        self.total_ge = sum(cnt * INVERTER_EQUIVALENTS.get(g, 2.0) for g, cnt in gate_breakdown.items())
-        self.total_transistors = sum(cnt * TRANSISTOR_COST.get(g, 6) for g, cnt in gate_breakdown.items())
+        self.total_gates = sum(self.gate_breakdown.values())
+        self.total_ge = sum(cnt * INVERTER_EQUIVALENTS.get(g, 2.0) for g, cnt in self.gate_breakdown.items())
+        self.total_transistors = sum(cnt * TRANSISTOR_COST.get(g, 6) for g, cnt in self.gate_breakdown.items())
 
     def emit(self) -> str:
         lines: List[str] = []

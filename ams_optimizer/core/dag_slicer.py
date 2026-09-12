@@ -12,6 +12,7 @@ import re
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from .models import SlicedPort, SlicedRegister, DAGNode, SlicedDAG
+from .rtl_simulator import RTLCombinationalSimulator
 
 
 
@@ -163,60 +164,15 @@ class VerilogDAGSlicer:
             self._extract_register_next_states(dag, body)
 
     def _extract_register_next_states(self, dag: SlicedDAG, body: str):
-        """Extracts D-inputs for registers (e.g. cnt <= cnt + 1, q <= q + 1, etc.)."""
+        """Extracts D-inputs for all registers using the unified RTL procedural simulator."""
         for r_name, reg in dag.registers.items():
-            # Check counter increment pattern: r <= r + 1 or if (ena) r <= r + 1
-            inc_match = re.search(rf"\b{re.escape(r_name)}\s*<=\s*{re.escape(r_name)}\s*\+\s*(\d+'[bhd]\d+|\d+)", body)
-            if inc_match and "clock_divider" not in dag.module_name:
-                step = _parse_int_val(inc_match.group(1))
-                # Check for enable condition
-                ena_match = re.search(rf"else\s+if\s*\((.*?)\)\s*begin\s*{re.escape(r_name)}\s*<=", body, re.DOTALL)
-                if not ena_match:
-                    ena_match = re.search(rf"if\s*\((.*?)\)\s*{re.escape(r_name)}\s*<=", body)
-                ena_expr = ena_match.group(1).strip() if ena_match else None
-
-                # Generate bitwise next-state DAG nodes for counter
-                for bit_idx in range(reg.width):
-                    b_name = f"{r_name}[{bit_idx}]" if reg.width > 1 else r_name
-                    node_name = f"{b_name}_d"
-                    
-                    # Inputs this bit depends on: all lower bits + enable (if any)
-                    dep_inputs = [f"{r_name}[{j}]" if reg.width > 1 else r_name for j in range(bit_idx + 1)]
-                    if ena_expr:
-                        dep_inputs.append(ena_expr)
-
-                    def make_cnt_eval(b_i: int, width: int, ena_s: Optional[str], r_n: str):
-                        def _eval(inputs: Dict[str, int]) -> int:
-                            if ena_s and not inputs.get(ena_s, 1):
-                                # Hold value
-                                key = f"{r_n}[{b_i}]" if width > 1 else r_n
-                                return inputs.get(key, 0)
-                            # Current counter value for bits 0..b_i
-                            val = 0
-                            for j in range(b_i + 1):
-                                k = f"{r_n}[{j}]" if width > 1 else r_n
-                                val |= (inputs.get(k, 0) << j)
-                            next_val = val + step
-                            return (next_val >> b_i) & 1
-                        return _eval
-
-                    dag.nodes[node_name] = DAGNode(
-                        name=node_name,
-                        node_type="register_d",
-                        inputs=dep_inputs,
-                        eval_fn=make_cnt_eval(bit_idx, reg.width, ena_expr, r_name),
-                        level=1,
-                        raw_expr=f"{r_name} + {step} bit {bit_idx}"
-                    )
-            else:
-                # Handle general state transition / load assignments
-                for bit_idx in range(reg.width):
-                    b_name = f"{r_name}[{bit_idx}]" if reg.width > 1 else r_name
-                    node_name = f"{b_name}_d"
-                    self._synthesize_generic_reg_d(dag, r_name, reg, bit_idx, body)
+            for bit_idx in range(reg.width):
+                b_name = f"{r_name}[{bit_idx}]" if reg.width > 1 else r_name
+                node_name = f"{b_name}_d"
+                self._synthesize_generic_reg_d(dag, r_name, reg, bit_idx, body)
 
     def _synthesize_generic_reg_d(self, dag: SlicedDAG, r_name: str, reg: SlicedRegister, bit_idx: int, body: str):
-        """Builds next-state evaluator for FSM state registers and general registers."""
+        """Builds next-state evaluator for FSM state registers and general registers using RTL simulator."""
         b_name = f"{r_name}[{bit_idx}]" if reg.width > 1 else r_name
         node_name = f"{b_name}_d"
 
@@ -230,92 +186,20 @@ class VerilogDAGSlicer:
                 if b not in candidate_inputs:
                     candidate_inputs.append(b)
 
-        # Build dynamic evaluator from Verilog body
-        def make_generic_eval(r_n: str, b_i: int, width: int):
-            def _eval(inputs: Dict[str, int]) -> int:
-                # 1. Clock Divider logic
-                if "clock_divider" in dag.module_name:
-                    load = inputs.get("load", 0)
-                    div_ratio = (inputs.get("div_ratio[0]", 0)) | (inputs.get("div_ratio[1]", 0) << 1) | (inputs.get("div_ratio[2]", 0) << 2) | (inputs.get("div_ratio[3]", 0) << 3)
-                    cnt_val = (inputs.get("cnt_reg[0]", 0)) | (inputs.get("cnt_reg[1]", 0) << 1) | (inputs.get("cnt_reg[2]", 0) << 2) | (inputs.get("cnt_reg[3]", 0) << 3)
-                    clk_out_val = inputs.get("clk_out", 0)
+        if not hasattr(self, "_rtl_sim") or self._rtl_sim is None:
+            self._rtl_sim = RTLCombinationalSimulator(self.raw_code)
 
-                    if r_n == "cnt_reg":
-                        if load:
-                            return (div_ratio >> b_i) & 1
-                        elif cnt_val == 0:
-                            return (div_ratio >> b_i) & 1
-                        else:
-                            return ((cnt_val + 1) >> b_i) & 1
-                    elif r_n == "clk_out":
-                        if load:
-                            return 0
-                        elif cnt_val == 0:
-                            return 1 if (clk_out_val == 0) else 0
-                        else:
-                            return clk_out_val
+        target_sig = node_name
+        sim = self._rtl_sim
 
-                # 2. SAR ADC logic
-                if "sar_adc_ctrl" in dag.module_name or "dac_reg" in r_n or "state" in r_n:
-                    st = (inputs.get("state[0]", 0)) | (inputs.get("state[1]", 0) << 1) | (inputs.get("state[2]", 0) << 2)
-                    start = inputs.get("start", 0)
-                    comp_out = inputs.get("comp_out", 0)
-                    
-                    if r_n == "state":
-                        if st == 0:
-                            next_st = 1 if start else 0
-                        elif 1 <= st <= 4:
-                            next_st = st + 1
-                        else:
-                            next_st = 0
-                        return (next_st >> b_i) & 1
-                    elif r_n == "dac_reg":
-                        dac_val = 0
-                        for j in range(4):
-                            dac_val |= (inputs.get(f"dac_reg[{j}]", 0) << j)
-                        if st == 0:
-                            next_dac = 0
-                        elif st == 1:
-                            next_dac = (dac_val | (1 << 3))
-                        elif st == 2:
-                            next_dac = (dac_val & ~(1 << 3)) | (1 << 2) if comp_out else (dac_val | (1 << 2))
-                        elif st == 3:
-                            next_dac = (dac_val & ~(1 << 2)) | (1 << 1) if comp_out else (dac_val | (1 << 1))
-                        elif st == 4:
-                            next_dac = (dac_val & ~(1 << 1)) | 1 if comp_out else (dac_val | 1)
-                        else:
-                            next_dac = dac_val
-                        return (next_dac >> b_i) & 1
-                    elif r_n == "eoc_reg":
-                        return 1 if (st == 4) else 0
-
-                # 3. Bandgap trim logic
-                if "bandgap_trim" in dag.module_name or "trim_reg" in r_n:
-                    start_trim = inputs.get("start_trim", 0)
-                    comp_high = inputs.get("comp_high", 0)
-                    done = inputs.get("done_reg", 0)
-                    trim = (inputs.get("trim_reg[0]", 0)) | (inputs.get("trim_reg[1]", 0) << 1) | (inputs.get("trim_reg[2]", 0) << 2)
-                    if r_n == "trim_reg":
-                        if start_trim and not comp_high and not done:
-                            next_trim = (trim + 1) & 7
-                        else:
-                            next_trim = trim
-                        return (next_trim >> b_i) & 1
-                    elif r_n == "done_reg":
-                        if start_trim and comp_high:
-                            return 1
-                        return done
-
-                # Default hold current bit
-                key = f"{r_n}[{b_i}]" if width > 1 else r_n
-                return inputs.get(key, 0)
-            return _eval
+        def make_eval(sig: str, simulator: RTLCombinationalSimulator):
+            return lambda inputs: simulator.simulate_vector(inputs).get(sig, 0)
 
         dag.nodes[node_name] = DAGNode(
             name=node_name,
             node_type="register_d",
             inputs=candidate_inputs,
-            eval_fn=make_generic_eval(r_name, bit_idx, reg.width),
+            eval_fn=make_eval(target_sig, sim),
             level=1,
             raw_expr=f"{r_name} next state bit {bit_idx}"
         )
@@ -459,8 +343,10 @@ class VerilogDAGSlicer:
             def make_eq_eval(bits: List[str], target: int):
                 def _eval(inp: Dict[str, int]) -> int:
                     val = 0
-                    for idx, b in enumerate(bits):
-                        val |= (inp.get(b, 0) << idx)
+                    for b in bits:
+                        m = re.search(r"\[(\d+)\]", b)
+                        b_idx = int(m.group(1)) if m else 0
+                        val |= (inp.get(b, 0) << b_idx)
                     return 1 if (val == target) else 0
                 return _eval
 

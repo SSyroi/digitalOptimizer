@@ -146,9 +146,9 @@ module gray_counter_va (clk, rst_n, ena, count_bin, count_gray);
     end
 
     // Multi-Level Combinational Logic Evaluations
-    q_0_d = XOR2(q_0_q, V(ena));
-    q_1_d = MUX2(q_0_q, q_1_q, XOR2(q_1_q, V(ena)));
-    q_2_d = MUX2(q_2_q, AND3(q_0_q, q_1_q, V(ena)), NAND3(q_0_q, q_1_q, V(ena)));
+    q_0_d = XOR2(V(ena), q_0_q);
+    q_1_d = MUX2(V(ena), q_1_q, XOR2(q_1_q, q_0_q));
+    q_2_d = MUX2(q_2_q, AND3(V(ena), q_1_q, q_0_q), NAND3(V(ena), q_1_q, q_0_q));
     count_bin_0_val = q_0_q;
     count_bin_1_val = q_1_q;
     count_bin_2_val = q_2_q;

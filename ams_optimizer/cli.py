@@ -16,9 +16,11 @@ if __package__ is None or __package__ == "":
         sys.path.insert(0, parent_dir)
     from ams_optimizer.core.optimizer import AMSOptimizer
     from ams_optimizer.core.netlist_generator import StructuralNetlistGenerator
+    from ams_optimizer.core.stage_verifier import StageByStageVerifier
 else:
     from .core.optimizer import AMSOptimizer
     from .core.netlist_generator import StructuralNetlistGenerator
+    from .core.stage_verifier import StageByStageVerifier
 
 
 def main():
@@ -33,6 +35,7 @@ def main():
     parser.add_argument("--save-report", help="Path to save BOM report (.txt / .md)")
     parser.add_argument("--verify", dest="verify", action="store_true", default=True, help="Run Formal Logic Equivalence Checking (LEC) (default: enabled)")
     parser.add_argument("--no-verify", dest="verify", action="store_false", help="Disable Formal Logic Equivalence Checking")
+    parser.add_argument("--stage-verify", action="store_true", help="Run Stage-by-Stage verification matrix across all transformation stages")
     parser.add_argument("--vdd", type=float, default=1.8, help="Supply voltage in Volts (default: 1.8)")
     parser.add_argument("--vth", type=float, default=0.9, help="Logic threshold voltage in Volts (default: 0.9)")
     parser.add_argument("--lib", default="tsmcN65", help="Target Cadence standard cell library name (default: tsmcN65)")
@@ -77,6 +80,31 @@ def main():
             print(f"  WARNING: {len(eq.mismatches)} discrepancies detected! First mismatch:")
             print(f"    Signal: {eq.mismatches[0]['signal']}, Golden={eq.mismatches[0]['golden_val']}, Mapped={eq.mismatches[0]['optimized_val']}")
             print(f"    Inputs: {eq.mismatches[0]['inputs']}")
+
+    if args.stage_verify:
+        verifier = StageByStageVerifier(verilog_code, result.dag, result.mapped_nodes)
+        stage_rep = verifier.run_verification()
+        status_sym = "[PASS]" if stage_rep.passed else "[FAIL]"
+        print(f"\n--- Stage-by-Stage Logic Transformation Verification ---")
+        print(f"  Overall Status        : {status_sym} {'100% MATCH Across All Transformation Stages' if stage_rep.passed else 'MISMATCH DETECTED'}")
+        print(f"  Stimulus Vectors      : {stage_rep.total_vectors} combinations simulated (Flip-Flops Cut, Stage 0 Reference)")
+        print(f"  Execution Time        : {stage_rep.execution_time_seconds:.4f}s")
+        print(f"  Signals Verified      : {len(stage_rep.signals_checked)} signals: {', '.join(stage_rep.signals_checked[:6])}{'...' if len(stage_rep.signals_checked) > 6 else ''}")
+        print(f"  Transformation Stages Matrix:")
+        print(f"    - Stage 0: Golden RTL Reference       : {stage_rep.total_vectors} / {stage_rep.total_vectors} vectors (Baseline)")
+        for st_name in stage_rep.stages_tested[1:]:
+            cnt = stage_rep.stage_match_counts.get(st_name, 0)
+            pct = (cnt / stage_rep.total_vectors * 100) if stage_rep.total_vectors > 0 else 100.0
+            st_sym = "[OK]" if cnt == stage_rep.total_vectors else "[FAIL]"
+            print(f"    - {st_name:<36}: {cnt:>5} / {stage_rep.total_vectors} ({pct:5.1f}%) {st_sym}")
+
+        if stage_rep.mismatches:
+            print(f"\n  WARNING: {len(stage_rep.mismatches)} discrepancies detected across stages! First mismatch:")
+            m = stage_rep.mismatches[0]
+            print(f"    Stage: {m.stage_name} (Index {m.stage_index})")
+            print(f"    Signal: {m.signal_name}, Vector #{m.vector_index}")
+            print(f"    Golden Value = {m.golden_val}, Stage Value = {m.stage_val}")
+            print(f"    Stimulus: {m.stimulus}")
 
     print("\n--- Schematic Bill of Materials (BOM) ---")
     for g, cnt in sorted(result.gate_breakdown.items()):

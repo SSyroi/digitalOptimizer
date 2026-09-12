@@ -85,6 +85,8 @@ class StandardCellEvaluator:
             return 0
         if expr in ("1.0", "1", "1'b1", "1'd1"):
             return 1
+        if expr.startswith("V(") and expr.endswith(")"):
+            return env.get(expr, env.get(expr[2:-1], 0))
 
         gate_match = re.match(r"^([A-Z0-9]+)\((.*)\)$", expr)
         if not gate_match:

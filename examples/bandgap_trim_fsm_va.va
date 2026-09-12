@@ -7,16 +7,17 @@
 // Cadence Spectre & Virtuoso Compatible Verilog-A Model
 //
 // Circuit Complexity & Silicon Area Notes:
-//   - Total Gate Count         : 10 cells
-//   - Inverter Equivalents (GE) : 50.0 inverters (1 GE = 1 Inverter = 2 Transistors)
-//   - Est. Transistor Count    : ~100 transistors
+//   - Total Gate Count         : 31 cells
+//   - Inverter Equivalents (GE) : 104.0 inverters (1 GE = 1 Inverter = 2 Transistors)
+//   - Est. Transistor Count    : ~208 transistors
 //
 // Standard Cell Breakdown (Gate Counts & Inverter Weights):
+//   - AND2    :   2 cells (  6.0 inverters eq.,   12 transistors)
 //   - DFFR    :   4 cells ( 32.0 inverters eq.,   64 transistors)
-//   - INV     :   1 cells (  1.0 inverters eq.,    2 transistors)
-//   - MUX2    :   2 cells (  6.0 inverters eq.,   12 transistors)
-//   - OR2     :   1 cells (  3.0 inverters eq.,    6 transistors)
-//   - XOR2    :   2 cells (  8.0 inverters eq.,   16 transistors)
+//   - INV     :   4 cells (  4.0 inverters eq.,    8 transistors)
+//   - MUX2    :  16 cells ( 48.0 inverters eq.,   96 transistors)
+//   - NOR2    :   1 cells (  2.0 inverters eq.,    4 transistors)
+//   - OR2     :   4 cells ( 12.0 inverters eq.,   24 transistors)
 // ============================================================================
 
 module bandgap_trim_fsm_va (clk, rst_n, start_trim, comp_high, trim_code, trim_done);
@@ -149,9 +150,9 @@ module bandgap_trim_fsm_va (clk, rst_n, start_trim, comp_high, trim_code, trim_d
     end
 
     // Multi-Level Combinational Logic Evaluations
-    trim_reg_0_d = INV(trim_reg_0_q);
-    trim_reg_1_d = XOR2(trim_reg_0_q, trim_reg_1_q);
-    trim_reg_2_d = MUX2(trim_reg_0_q, trim_reg_2_q, XOR2(trim_reg_1_q, trim_reg_2_q));
+    trim_reg_0_d = MUX2(trim_reg_0_q, MUX2(V(start_trim), 0.0, NOR2(V(comp_high), done_reg_q)), MUX2(V(start_trim), 1.0, OR2(V(comp_high), done_reg_q)));
+    trim_reg_1_d = MUX2(trim_reg_1_q, MUX2(V(start_trim), 0.0, MUX2(V(comp_high), AND2(trim_reg_0_q, INV(done_reg_q)), 0.0)), MUX2(V(start_trim), 1.0, MUX2(V(comp_high), OR2(done_reg_q, INV(trim_reg_0_q)), 1.0)));
+    trim_reg_2_d = MUX2(trim_reg_2_q, MUX2(V(start_trim), 0.0, MUX2(V(comp_high), MUX2(trim_reg_1_q, 0.0, AND2(trim_reg_0_q, INV(done_reg_q))), 0.0)), MUX2(V(start_trim), 1.0, MUX2(V(comp_high), MUX2(trim_reg_1_q, 1.0, OR2(done_reg_q, INV(trim_reg_0_q))), 1.0)));
     done_reg_d = MUX2(V(start_trim), done_reg_q, OR2(V(comp_high), done_reg_q));
     trim_code_0_val = trim_reg_0_q;
     trim_code_1_val = trim_reg_1_q;

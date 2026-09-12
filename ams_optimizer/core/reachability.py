@@ -66,8 +66,21 @@ class FSMReachabilityAnalyzer:
     def get_dont_cares_for_inputs(self, pruned_inputs: List[str], true_minterms: List[int]) -> List[int]:
         """Maps unreachable FSM states to don't-cares if inputs match state registers."""
         dont_cares: List[int] = []
-        if len(pruned_inputs) == 3 and all("state" in inp for inp in pruned_inputs):
-            for unreach_st in self.unreachable_states:
-                if unreach_st not in true_minterms:
-                    dont_cares.append(unreach_st)
-        return dont_cares
+        if not self.unreachable_states:
+            return dont_cares
+
+        import re
+        fsm_regs = [r for r in self.dag.registers.values() if "state" in r.name]
+        for reg in fsm_regs:
+            reg_bits = [f"{reg.name}[{b}]" for b in range(reg.width)]
+            if len(pruned_inputs) == reg.width and set(pruned_inputs) == set(reg_bits):
+                for unreach_st in self.unreachable_states:
+                    row_idx = 0
+                    for p_idx, p_name in enumerate(pruned_inputs):
+                        m = re.search(r"\[(\d+)\]", p_name)
+                        b = int(m.group(1)) if m else 0
+                        bit_val = (unreach_st >> b) & 1
+                        row_idx |= (bit_val << p_idx)
+                    if row_idx not in true_minterms and row_idx not in dont_cares:
+                        dont_cares.append(row_idx)
+        return sorted(dont_cares)
