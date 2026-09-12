@@ -4,29 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ams-optimizer"
-version = "0.1.0"
-description = "Digital Logic Optimizer & Synthesizer for Custom Analog and Mixed-Signal (AMS) IC Blocks"
+version = "0.2.0"
+description = "Multi-Level DAG Digital Logic Optimizer & Synthesizer for Custom Analog & Mixed-Signal IC Blocks"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = [
-    "sympy>=1.12",
-    "pyyaml>=6.0",
-    "rich>=13.0",
-    "fastapi>=0.100.0",
-    "uvicorn>=0.22.0",
-    "jinja2>=3.1.0",
-    "pydantic>=2.0",
-]
+dependencies = []
 
 [project.scripts]
 ams-opt = "ams_optimizer.cli:main"
-v2-opt = "v2_sim_truth_table.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["ams_optimizer*", "v2_sim_truth_table*", "v1_ast_pipeline*"]
+include = ["ams_optimizer*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
-addopts = "--ignore=v1_ast_pipeline"
-
