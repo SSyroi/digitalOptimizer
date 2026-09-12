@@ -1,0 +1,567 @@
+{
+  "module_name": "PWM_CTRL",
+  "summary": {
+    "total_gates": 37,
+    "total_inverter_equivalents_ge": 123.0,
+    "total_transistors": 246,
+    "inverter_definition": "1 GE = 1 Inverter = 2 Transistors"
+  },
+  "ports": {
+    "clk": {
+      "direction": "input",
+      "width": "1",
+      "bits": [
+        "clk"
+      ]
+    },
+    "rst_n": {
+      "direction": "input",
+      "width": "1",
+      "bits": [
+        "rst_n"
+      ]
+    },
+    "en_LP_ext": {
+      "direction": "input",
+      "width": "1",
+      "bits": [
+        "en_LP_ext"
+      ]
+    },
+    "oc_select_ext": {
+      "direction": "input",
+      "width": "1",
+      "bits": [
+        "oc_select_ext"
+      ]
+    },
+    "oc_ctrl_cp_ext": {
+      "direction": "input",
+      "width": "1",
+      "bits": [
+        "oc_ctrl_cp_ext"
+      ]
+    },
+    "c_DfT_oc_dig_VDD": {
+      "direction": "input",
+      "width": "2",
+      "bits": [
+        "c_DfT_oc_dig_VDD[1]",
+        "c_DfT_oc_dig_VDD[0]"
+      ]
+    },
+    "cnt": {
+      "direction": "output",
+      "width": "4",
+      "bits": [
+        "cnt[3]",
+        "cnt[2]",
+        "cnt[1]",
+        "cnt[0]"
+      ]
+    },
+    "en_LP": {
+      "direction": "output",
+      "width": "1",
+      "bits": [
+        "en_LP"
+      ]
+    },
+    "en_LowFreq": {
+      "direction": "output",
+      "width": "1",
+      "bits": [
+        "en_LowFreq"
+      ]
+    },
+    "oc_select": {
+      "direction": "output",
+      "width": "1",
+      "bits": [
+        "oc_select"
+      ]
+    },
+    "oc_ctrl_bgr": {
+      "direction": "output",
+      "width": "1",
+      "bits": [
+        "oc_ctrl_bgr"
+      ]
+    },
+    "oc_ctrl_cp": {
+      "direction": "output",
+      "width": "1",
+      "bits": [
+        "oc_ctrl_cp"
+      ]
+    },
+    "is_az_mode": {
+      "direction": "output",
+      "width": "1",
+      "bits": [
+        "is_az_mode"
+      ]
+    },
+    "eff_oc_mode": {
+      "direction": "output",
+      "width": "2",
+      "bits": [
+        "eff_oc_mode[1]",
+        "eff_oc_mode[0]"
+      ]
+    }
+  },
+  "instances": [
+    {
+      "name": "U_REG_cnt_0",
+      "cell_type": "DFFR",
+      "connections": {
+        "CLK": "clk",
+        "D": "cnt[0]_d",
+        "Q": "cnt[0]",
+        "RN": "rst_n"
+      },
+      "level": 0,
+      "inverter_equivalent_ge": 8.0,
+      "transistors": 16
+    },
+    {
+      "name": "U_REG_cnt_1",
+      "cell_type": "DFFR",
+      "connections": {
+        "CLK": "clk",
+        "D": "cnt[1]_d",
+        "Q": "cnt[1]",
+        "RN": "rst_n"
+      },
+      "level": 0,
+      "inverter_equivalent_ge": 8.0,
+      "transistors": 16
+    },
+    {
+      "name": "U_REG_cnt_2",
+      "cell_type": "DFFR",
+      "connections": {
+        "CLK": "clk",
+        "D": "cnt[2]_d",
+        "Q": "cnt[2]",
+        "RN": "rst_n"
+      },
+      "level": 0,
+      "inverter_equivalent_ge": 8.0,
+      "transistors": 16
+    },
+    {
+      "name": "U_REG_cnt_3",
+      "cell_type": "DFFR",
+      "connections": {
+        "CLK": "clk",
+        "D": "cnt[3]_d",
+        "Q": "cnt[3]",
+        "RN": "rst_n"
+      },
+      "level": 0,
+      "inverter_equivalent_ge": 8.0,
+      "transistors": 16
+    },
+    {
+      "name": "U_COMB_1_is_az_mode_NOR2",
+      "cell_type": "NOR2",
+      "connections": {
+        "A": "eff_oc_mode[1]",
+        "B": "eff_oc_mode[0]",
+        "Y": "is_az_mode"
+      },
+      "level": 1,
+      "inverter_equivalent_ge": 2.0,
+      "transistors": 4
+    },
+    {
+      "name": "U_COMB_2_n_2_inv_INV",
+      "cell_type": "INV",
+      "connections": {
+        "A": "eff_oc_mode[0]",
+        "Y": "n_2_inv"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 1.0,
+      "transistors": 2
+    },
+    {
+      "name": "U_COMB_3_is_chop_mode_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "eff_oc_mode[1]",
+        "B": "n_2_inv",
+        "Y": "is_chop_mode"
+      },
+      "level": 1,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_4_n_4_inv_INV",
+      "cell_type": "INV",
+      "connections": {
+        "A": "cnt[3]",
+        "Y": "n_4_inv"
+      },
+      "level": 5,
+      "inverter_equivalent_ge": 1.0,
+      "transistors": 2
+    },
+    {
+      "name": "U_COMB_5_n_4_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "cnt[2]",
+        "B": "n_4_inv",
+        "Y": "n_4_and2"
+      },
+      "level": 4,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_6_n_6_inv_INV",
+      "cell_type": "INV",
+      "connections": {
+        "A": "cnt[2]",
+        "Y": "n_6_inv"
+      },
+      "level": 5,
+      "inverter_equivalent_ge": 1.0,
+      "transistors": 2
+    },
+    {
+      "name": "U_COMB_7_n_6_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "n_6_inv",
+        "B": "cnt[3]",
+        "Y": "n_6_and2"
+      },
+      "level": 4,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_8_n_4_or2_OR2",
+      "cell_type": "OR2",
+      "connections": {
+        "A": "n_4_and2",
+        "B": "n_6_and2",
+        "Y": "n_4_or2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_9_n_9_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "cnt[1]",
+        "B": "n_9_inv",
+        "Y": "n_9_and2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_10_n_4_or2_OR2",
+      "cell_type": "OR2",
+      "connections": {
+        "A": "n_4_or2",
+        "B": "n_9_and2",
+        "Y": "n_4_or2"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_11_n_11_inv_INV",
+      "cell_type": "INV",
+      "connections": {
+        "A": "cnt[0]",
+        "Y": "n_11_inv"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 1.0,
+      "transistors": 2
+    },
+    {
+      "name": "U_COMB_12_n_12_inv_INV",
+      "cell_type": "INV",
+      "connections": {
+        "A": "cnt[1]",
+        "Y": "n_12_inv"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 1.0,
+      "transistors": 2
+    },
+    {
+      "name": "U_COMB_13_n_11_and3_AND3",
+      "cell_type": "AND3",
+      "connections": {
+        "A": "n_11_inv",
+        "B": "n_12_inv",
+        "C": "cnt[3]",
+        "Y": "n_11_and3"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
+    },
+    {
+      "name": "U_COMB_14_is_pwm_active_window_OR2",
+      "cell_type": "OR2",
+      "connections": {
+        "A": "n_4_or2",
+        "B": "n_11_and3",
+        "Y": "is_pwm_active_window"
+      },
+      "level": 1,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_15_n_15_and3_AND3",
+      "cell_type": "AND3",
+      "connections": {
+        "A": "cnt[1]",
+        "B": "cnt[2]",
+        "C": "cnt[3]",
+        "Y": "n_15_and3"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
+    },
+    {
+      "name": "U_COMB_16_n_16_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "cnt[2]",
+        "B": "cnt[3]",
+        "Y": "n_16_and2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_17_n_17_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "cnt[2]",
+        "B": "cnt[3]",
+        "Y": "n_17_and2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_18_n_16_mux2_MUX2",
+      "cell_type": "MUX2",
+      "connections": {
+        "S": "cnt[1]",
+        "D0": "n_16_and2",
+        "D1": "n_17_and2",
+        "Y": "n_16_mux2"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_19_is_pwm_sample_window_MUX2",
+      "cell_type": "MUX2",
+      "connections": {
+        "S": "cnt[0]",
+        "D0": "n_15_and3",
+        "D1": "n_16_mux2",
+        "Y": "is_pwm_sample_window"
+      },
+      "level": 1,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_20_n_20_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "is_chop_mode",
+        "B": "is_pwm_active_window",
+        "Y": "n_20_and2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_21_n_21_inv_INV",
+      "cell_type": "INV",
+      "connections": {
+        "A": "is_chop_mode",
+        "Y": "n_21_inv"
+      },
+      "level": 4,
+      "inverter_equivalent_ge": 1.0,
+      "transistors": 2
+    },
+    {
+      "name": "U_COMB_22_n_21_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "n_21_inv",
+        "B": "en_LP_ext",
+        "Y": "n_21_and2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_23_en_LP_OR3",
+      "cell_type": "OR3",
+      "connections": {
+        "A": "is_az_mode",
+        "B": "n_20_and2",
+        "C": "n_21_and2",
+        "Y": "en_LP"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
+    },
+    {
+      "name": "U_COMB_24_n_24_or2_OR2",
+      "cell_type": "OR2",
+      "connections": {
+        "A": "n_24_inv",
+        "B": "is_pwm_sample_window",
+        "Y": "n_24_or2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_25_en_LowFreq_MUX2",
+      "cell_type": "MUX2",
+      "connections": {
+        "S": "is_az_mode",
+        "D0": "n_24_or2",
+        "D1": "0.0",
+        "Y": "en_LowFreq"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_26_n_26_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "is_chop_mode",
+        "B": "is_pwm_active_window",
+        "Y": "n_26_and2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_27_n_27_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "n_27_inv",
+        "B": "oc_select_ext",
+        "Y": "n_27_and2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_28_oc_select_OR3",
+      "cell_type": "OR3",
+      "connections": {
+        "A": "is_az_mode",
+        "B": "n_26_and2",
+        "C": "n_27_and2",
+        "Y": "oc_select"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
+    },
+    {
+      "name": "U_COMB_29_n_29_or2_OR2",
+      "cell_type": "OR2",
+      "connections": {
+        "A": "n_29_inv",
+        "B": "is_pwm_sample_window",
+        "Y": "n_29_or2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_30_oc_ctrl_bgr_MUX2",
+      "cell_type": "MUX2",
+      "connections": {
+        "S": "is_az_mode",
+        "D0": "n_29_or2",
+        "D1": "0.0",
+        "Y": "oc_ctrl_bgr"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_31_n_31_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "is_chop_mode",
+        "B": "is_pwm_active_window",
+        "Y": "n_31_and2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_32_n_32_and2_AND2",
+      "cell_type": "AND2",
+      "connections": {
+        "A": "n_32_inv",
+        "B": "oc_ctrl_cp_ext",
+        "Y": "n_32_and2"
+      },
+      "level": 3,
+      "inverter_equivalent_ge": 3.0,
+      "transistors": 6
+    },
+    {
+      "name": "U_COMB_33_oc_ctrl_cp_OR3",
+      "cell_type": "OR3",
+      "connections": {
+        "A": "is_az_mode",
+        "B": "n_31_and2",
+        "C": "n_32_and2",
+        "Y": "oc_ctrl_cp"
+      },
+      "level": 2,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
+    }
+  ]
+}

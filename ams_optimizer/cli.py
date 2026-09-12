@@ -15,8 +15,10 @@ if __package__ is None or __package__ == "":
     if parent_dir not in sys.path:
         sys.path.insert(0, parent_dir)
     from ams_optimizer.core.optimizer import AMSOptimizer
+    from ams_optimizer.core.netlist_generator import StructuralNetlistGenerator
 else:
     from .core.optimizer import AMSOptimizer
+    from .core.netlist_generator import StructuralNetlistGenerator
 
 
 def main():
@@ -26,6 +28,7 @@ def main():
     )
     parser.add_argument("verilog_file", help="Path to input Verilog RTL file (.v)")
     parser.add_argument("-o", "--output-va", help="Path to output Cadence Verilog-A file (.va)")
+    parser.add_argument("--save-netlist", help="Path to output structural gate netlist in JSON format (.json)")
     parser.add_argument("--save-skill", help="Path to output Cadence Virtuoso SKILL schematic script (.il)")
     parser.add_argument("--save-report", help="Path to save BOM Markdown report (.md)")
     parser.add_argument("--vdd", type=float, default=1.8, help="Supply voltage in Volts (default: 1.8)")
@@ -60,8 +63,9 @@ def main():
     for g, cnt in sorted(result.gate_breakdown.items()):
         print(f"  {g:<10}: {cnt:>3} cells")
     print("-" * 35)
-    print(f"  TOTAL GATES: {result.total_gates}")
-    print(f"  EST. TRANSISTORS: ~{result.total_transistors}")
+    print(f"  TOTAL GATES           : {result.total_gates} cells")
+    print(f"  INVERTER EQUIVALENTS  : {result.total_inverter_equivalents:.1f} inverters (1 GE = 1 Inverter = 2T)")
+    print(f"  EST. TRANSISTORS      : ~{result.total_transistors} transistors")
     print("=" * 78)
 
     if args.output_va:
@@ -75,6 +79,12 @@ def main():
         print(preview)
         if len(lines) > 45:
             print(f"... [{len(lines)-45} more lines omitted, use -o to save full file]")
+
+    if args.save_netlist:
+        json_netlist = StructuralNetlistGenerator.to_json_str(result.structural_netlist)
+        with open(args.save_netlist, "w") as f:
+            f.write(json_netlist)
+        print(f"[OK] Saved Structural Gate Netlist JSON to: {args.save_netlist}")
 
     if args.save_skill:
         with open(args.save_skill, "w") as f:

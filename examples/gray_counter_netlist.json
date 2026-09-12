@@ -1,0 +1,115 @@
+{
+  "module_name": "gray_counter",
+  "summary": {
+    "total_gates": 5,
+    "total_inverter_equivalents_ge": 32.0,
+    "total_transistors": 64,
+    "inverter_definition": "1 GE = 1 Inverter = 2 Transistors"
+  },
+  "ports": {
+    "clk": {
+      "direction": "input",
+      "width": "1",
+      "bits": [
+        "clk"
+      ]
+    },
+    "rst_n": {
+      "direction": "input",
+      "width": "1",
+      "bits": [
+        "rst_n"
+      ]
+    },
+    "ena": {
+      "direction": "input",
+      "width": "1",
+      "bits": [
+        "ena"
+      ]
+    },
+    "count_bin": {
+      "direction": "output",
+      "width": "3",
+      "bits": [
+        "count_bin[2]",
+        "count_bin[1]",
+        "count_bin[0]"
+      ]
+    },
+    "count_gray": {
+      "direction": "output",
+      "width": "3",
+      "bits": [
+        "count_gray[2]",
+        "count_gray[1]",
+        "count_gray[0]"
+      ]
+    }
+  },
+  "instances": [
+    {
+      "name": "U_REG_q_0",
+      "cell_type": "DFFR",
+      "connections": {
+        "CLK": "clk",
+        "D": "q[0]_d",
+        "Q": "q[0]",
+        "RN": "rst_n"
+      },
+      "level": 0,
+      "inverter_equivalent_ge": 8.0,
+      "transistors": 16
+    },
+    {
+      "name": "U_REG_q_1",
+      "cell_type": "DFFR",
+      "connections": {
+        "CLK": "clk",
+        "D": "q[1]_d",
+        "Q": "q[1]",
+        "RN": "rst_n"
+      },
+      "level": 0,
+      "inverter_equivalent_ge": 8.0,
+      "transistors": 16
+    },
+    {
+      "name": "U_REG_q_2",
+      "cell_type": "DFFR",
+      "connections": {
+        "CLK": "clk",
+        "D": "q[2]_d",
+        "Q": "q[2]",
+        "RN": "rst_n"
+      },
+      "level": 0,
+      "inverter_equivalent_ge": 8.0,
+      "transistors": 16
+    },
+    {
+      "name": "U_COMB_1_count_gray_1_XOR2",
+      "cell_type": "XOR2",
+      "connections": {
+        "A": "q[2]",
+        "B": "q[1]",
+        "Y": "count_gray[1]"
+      },
+      "level": 1,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
+    },
+    {
+      "name": "U_COMB_2_count_gray_0_XOR2",
+      "cell_type": "XOR2",
+      "connections": {
+        "A": "q[1]",
+        "B": "q[0]",
+        "Y": "count_gray[0]"
+      },
+      "level": 1,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
+    }
+  ]
+}

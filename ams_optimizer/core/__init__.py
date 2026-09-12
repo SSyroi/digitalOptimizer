@@ -11,8 +11,11 @@ from .models import (
     LocalTruthTable,
     MappedCell,
     MappedLogicNode,
+    GateInstance,
+    StructuralNetlist,
     OptimizationResult,
     TRANSISTOR_COST,
+    INVERTER_EQUIVALENTS,
 )
 from .dag_slicer import VerilogDAGSlicer
 from .reachability import FSMReachabilityAnalyzer
@@ -21,6 +24,7 @@ from .npn_matcher import NPNBitmaskMatcher
 from .shannon_mux import ShannonMUXDecomposer
 from .quine_mccluskey import QuineMcCluskeySolver
 from .tech_mapper import TechnologyMapper
+from .netlist_generator import StructuralNetlistGenerator
 from .veriloga_emitter import VerilogAEmitter
 from .skill_emitter import SKILLEmitter
 from .optimizer import AMSOptimizer
@@ -33,8 +37,11 @@ __all__ = [
     "LocalTruthTable",
     "MappedCell",
     "MappedLogicNode",
+    "GateInstance",
+    "StructuralNetlist",
     "OptimizationResult",
     "TRANSISTOR_COST",
+    "INVERTER_EQUIVALENTS",
     "VerilogDAGSlicer",
     "FSMReachabilityAnalyzer",
     "LocalTruthTableEvaluator",
@@ -42,6 +49,7 @@ __all__ = [
     "ShannonMUXDecomposer",
     "QuineMcCluskeySolver",
     "TechnologyMapper",
+    "StructuralNetlistGenerator",
     "VerilogAEmitter",
     "SKILLEmitter",
     "AMSOptimizer",

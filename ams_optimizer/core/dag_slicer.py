@@ -84,6 +84,7 @@ class VerilogDAGSlicer:
             lsb = int(match.group(3)) if match.group(3) is not None else 0
             width = abs(msb - lsb) + 1 if match.group(2) is not None else 1
             names = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", match.group(4))
+            names = [n for n in names if n not in ("input", "output", "inout", "wire", "reg", "logic", "signed", "unsigned")]
             for p_name in names:
                 if p_name and p_name not in dag.ports:
                     dag.ports[p_name] = SlicedPort(name=p_name, direction=p_dir, width=width, msb=msb, lsb=lsb)
@@ -94,6 +95,7 @@ class VerilogDAGSlicer:
             lsb = int(match.group(2)) if match.group(2) is not None else 0
             width = abs(msb - lsb) + 1 if match.group(1) is not None else 1
             names = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", match.group(3))
+            names = [n for n in names if n not in ("reg", "logic", "signed", "unsigned", "wire")]
             for r_name in names:
                 if r_name:
                     # Check if this reg is sequential in an always block

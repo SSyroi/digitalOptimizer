@@ -14,7 +14,7 @@
 
 ---
 
-## 💡 Key Highlights
+### 💡 Key Highlights
 
 - **Zero External Dependencies**: 100% pure Python 3.9+ standard library. Runs out of the box on locked-down corporate UNIX servers without `pip install` or C++ compilers.
 - **Multi-Level DAG Sharing**: Preserves intermediate conditions (`is_az_mode`, `is_chop_mode`, `eff_oc_mode`) as shared graph nodes, avoiding the 5.7× gate explosion of flat 2-level truth tables.
@@ -23,22 +23,25 @@
   - **Shannon Decomposition**: Automatically extracts 6-transistor transmission-gate `MUX2` cells.
   - **Quine-McCluskey with Don't-Cares ($X$)**: Minimal prime implicants for custom FSM transition cones.
 - **Automated FSM State Reachability**: Analyzes reachable state space from reset; marks unreachable states as Don't-Cares to maximize gate reduction.
-- **Full Cadence Deliverables**:
-  - **Cadence Spectre Verilog-A (`.va`)**: Continuous analog voltage contributions (`V(out) <+ transition(...)`), `@(initial_step)` reset, and `@(cross(V(clk)-vth, +1))` clock sampling.
+- **Full Cadence Deliverables & Intermediate Netlist**:
+  - **Cadence Spectre Verilog-A (`.va`)**: Continuous analog voltage contributions (`V(out) <+ transition(...)`), `@(initial_step)` reset, `@(cross(V(clk)-vth, +1))` clock sampling, and **detailed Inverter Equivalents (GE)** header notes.
+  - **Structural Gate Netlist (`.json`)**: Intermediate gate-level netlist capturing all standard cell instances, topological levels, and pin-to-pin connections for future schematic mapping.
   - **Cadence Virtuoso SKILL (`.il`)**: Automated schematic generator placing standard cells in dependency rank columns.
-  - **Schematic Bill of Materials (BOM) Report (`.md`)**.
+  - **Schematic Bill of Materials (BOM) Report (`.md` / `.txt`)**.
 
 ---
 
 ## 📊 Benchmark Results
 
-| Circuit | Description | Regs | Total Gates | Est. Transistors | Key Gates Mapped |
-| :--- | :--- | :---: | :---: | :---: | :--- |
-| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller | 4 | **44 cells** | **~264 T** | `MUX2`, `NOR2`, `AND2`, `OR3`, `DFFR` |
-| **`gray_counter.v`** | 3-bit binary to Gray-code generator | 3 | **5 cells** | **~64 T** | `XOR2`, `DFFR` |
-| **`sar_adc_ctrl.v`** | 4-bit synchronous SAR ADC controller | 8 | **59 cells** | **~394 T** | `MUX2`, `XOR2`, `NOR2`, `AND3`, `DFFR` |
-| **`bandgap_trim_fsm.v`**| Comparator-guided bandgap trimmer | 4 | **33 cells** | **~216 T** | `MUX2`, `NAND2`, `NOR2`, `DFFR` |
-| **`clock_divider_rst.v`**| Configurable 4-bit loadable clock divider | 5 | **85 cells** | **~462 T** | `MUX2`, `NOR3`, `AND4`, `DFFR` |
+| Circuit | Description | Regs | Total Gates | Inverter Eq. (GE) | Est. Transistors | Key Gates Mapped |
+| :--- | :--- | :---: | :---: | :---: | :---: | :--- |
+| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller | 4 | **42 cells** | **128.0 GE** | **~256 T** | `MUX2`, `NOR2`, `AND2`, `OR3`, `DFFR` |
+| **`gray_counter.v`** | 3-bit binary to Gray-code generator | 3 | **5 cells** | **32.0 GE** | **~64 T** | `XOR2`, `DFFR` |
+| **`sar_adc_ctrl.v`** | 4-bit synchronous SAR ADC controller | 8 | **59 cells** | **197.0 GE** | **~394 T** | `MUX2`, `XOR2`, `NOR2`, `AND3`, `DFFR` |
+| **`bandgap_trim_fsm.v`**| Comparator-guided bandgap trimmer | 4 | **31 cells** | **104.0 GE** | **~208 T** | `MUX2`, `NOR2`, `DFFR` |
+| **`clock_divider_rst.v`**| Configurable 4-bit loadable clock divider | 5 | **85 cells** | **231.0 GE** | **~462 T** | `MUX2`, `NOR3`, `AND4`, `DFFR` |
+
+*Note: 1 Gate Equivalent (GE) = 1 Inverter = 2 Transistors (e.g. NAND2 = 2.0 GE, AND2 = 3.0 GE, MUX2 = 3.0 GE, DFFR = 8.0 GE).*
 
 ---
 
@@ -47,16 +50,19 @@
 No installation needed. Run directly with Python 3.9+:
 
 ```bash
-# 1. Synthesize PWM_CTRL to Cadence Verilog-A and Virtuoso SKILL
+# 1. Synthesize PWM_CTRL to Verilog-A, Structural Netlist JSON, and Virtuoso SKILL
 python3 ams_optimizer/cli.py examples/PWM_CTRL.v \
   -o examples/PWM_CTRL_va.va \
+  --save-netlist examples/PWM_CTRL_netlist.json \
   --save-skill examples/PWM_CTRL_schematic.il \
-  --save-report examples/PWM_CTRL_bom.md \
+  --save-report examples/PWM_CTRL_report.txt \
   --vdd 1.8 \
   --vth 0.9
 
 # 2. Synthesize SAR ADC Controller
-python3 ams_optimizer/cli.py examples/sar_adc_ctrl.v -o examples/sar_adc_ctrl_va.va
+python3 ams_optimizer/cli.py examples/sar_adc_ctrl.v \
+  -o examples/sar_adc_ctrl_va.va \
+  --save-netlist examples/sar_adc_ctrl_netlist.json
 
 # 3. Or install as a local command (optional)
 pip install -e .
@@ -70,7 +76,7 @@ ams-opt examples/gray_counter.v -o examples/gray_counter_va.va
 Run the test suite with standard Python (zero pip dependencies):
 
 ```bash
-PYTHONPATH=. python3 -m unittest discover -s tests
+python3 -m unittest discover -s tests -v
 ```
 
 Or using pytest:
@@ -88,7 +94,7 @@ digitalOptimizer/
 │   ├── __init__.py
 │   ├── cli.py                 # Pure standard library CLI
 │   └── core/
-│       ├── models.py          # Core dataclasses and transistor cost table
+│       ├── models.py          # Dataclasses, transistor & inverter equivalent costs
 │       ├── dag_slicer.py      # Multi-level RTL slicer & intermediate node extractor
 │       ├── reachability.py    # FSM state reachability analyzer (Don't-Cares)
 │       ├── truth_table.py     # Local node truth-table evaluator & variable pruner
@@ -96,26 +102,31 @@ digitalOptimizer/
 │       ├── npn_matcher.py     # NPN bitmask matching (AOI21, XOR2, NAND, NOR)
 │       ├── quine_mccluskey.py # Pure-Python Quine-McCluskey / Petrick solver
 │       ├── tech_mapper.py     # Technology mapping & global inverter sharing
-│       ├── veriloga_emitter.py# Cadence Spectre Verilog-A emitter
+│       ├── netlist_generator.py # Intermediate structural gate netlist & JSON serializer
+│       ├── veriloga_emitter.py# Cadence Spectre Verilog-A emitter with GE notes
 │       ├── skill_emitter.py   # Cadence Virtuoso SKILL (.il) schematic generator
 │       └── optimizer.py       # Master synthesis coordinator
-├── examples/                  # Benchmark RTL & synthesized Verilog-A models
+├── examples/                  # Benchmark RTL, Verilog-A models & JSON netlists
 │   ├── PWM_CTRL.v
 │   ├── PWM_CTRL_va.va
+│   ├── PWM_CTRL_netlist.json
 │   ├── gray_counter.v
 │   ├── gray_counter_va.va
+│   ├── gray_counter_netlist.json
 │   ├── sar_adc_ctrl.v
 │   ├── sar_adc_ctrl_va.va
+│   ├── sar_adc_ctrl_netlist.json
 │   ├── bandgap_trim_fsm.v
 │   ├── bandgap_trim_fsm_va.va
+│   ├── bandgap_trim_fsm_netlist.json
 │   ├── clock_divider_rst.v
-│   └── clock_divider_rst_va.va
+│   ├── clock_divider_rst_va.va
+│   └── clock_divider_rst_netlist.json
 ├── tests/                     # Zero-dependency unit & algorithm tests
 │   ├── test_optimizer.py
 │   └── test_algorithms.py
 ├── pyproject.toml
 └── README.md
-
 ```
 
 ---
