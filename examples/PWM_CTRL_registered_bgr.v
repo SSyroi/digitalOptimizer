@@ -124,8 +124,8 @@ always @(posedge clk_i or negedge res_n) begin
       // Controls rise at cnt=15, stay high at cnt=0, drop at cnt=1
       oc_ctrl_bgr <= (cnt == 4'd14) || (cnt == 4'd15);
     end else if (c_DfT_en_PWM && is_chop_mode) begin
-      // Swaps chopping polarity once per period, at the middle of LP=0 gap
-      if (cnt == 4'd15) begin
+      // Swaps chopping polarity once per period, at the middle of the LP=0 gap (cnt: 0 -> 1)
+      if (cnt == 4'd0) begin
         oc_ctrl_bgr <= ~oc_ctrl_bgr;
       end
     end else if (is_chop_mode) begin

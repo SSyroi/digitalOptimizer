@@ -7,20 +7,20 @@
 // Cadence Spectre & Virtuoso Compatible Verilog-A Model
 //
 // Circuit Complexity & Silicon Area Notes:
-//   - Total Gate Count         : 109 cells
-//   - Inverter Equivalents (GE) : 304.0 inverters (1 GE = 1 Inverter = 2 Transistors)
-//   - Est. Transistor Count    : ~608 transistors
+//   - Total Gate Count         : 110 cells
+//   - Inverter Equivalents (GE) : 307.0 inverters (1 GE = 1 Inverter = 2 Transistors)
+//   - Est. Transistor Count    : ~614 transistors
 //
 // Standard Cell Breakdown (Gate Counts & Inverter Weights):
 //   - AOI21   :   1 cells (  3.0 inverters eq.,    6 transistors)
 //   - AOI22   :   5 cells ( 20.0 inverters eq.,   40 transistors)
 //   - DFFR    :   4 cells ( 68.0 inverters eq.,  136 transistors)
 //   - DFFS    :   2 cells ( 34.0 inverters eq.,   68 transistors)
-//   - INV     :  25 cells ( 25.0 inverters eq.,   50 transistors)
-//   - NAND2   :  61 cells (122.0 inverters eq.,  244 transistors)
+//   - INV     :  24 cells ( 24.0 inverters eq.,   48 transistors)
+//   - NAND2   :  62 cells (124.0 inverters eq.,  248 transistors)
 //   - NAND3   :   3 cells (  9.0 inverters eq.,   18 transistors)
 //   - NAND4   :   3 cells ( 12.0 inverters eq.,   24 transistors)
-//   - NOR2    :   4 cells (  8.0 inverters eq.,   16 transistors)
+//   - NOR2    :   5 cells ( 10.0 inverters eq.,   20 transistors)
 //   - NOR3    :   1 cells (  3.0 inverters eq.,    6 transistors)
 // ============================================================================
 
@@ -195,9 +195,9 @@ module PWM_CTRL (VDD, VSS, sub, res_n, c_DfT_en_LP, c_DfT_en_PWM, c_DfT_oc_dig_V
   real oc_select_ext_val;
   real oc_ctrl_cp_ext_val;
   real en_LP_ext_val;
+  real oc_ctrl_cp_val;
   real en_LP_val;
   real en_lowFreq_val;
-  real oc_ctrl_cp_val;
   real oc_select_val;
 
   analog begin
@@ -240,12 +240,12 @@ module PWM_CTRL (VDD, VSS, sub, res_n, c_DfT_en_LP, c_DfT_en_PWM, c_DfT_oc_dig_V
     c_metalFix_invert_oc_defaults_in = ((V(c_metalFix_invert_oc_defaults) > V(VDD,VSS)*0.5) ? 1.0 : 0.0);
 
     // Multi-Level Combinational Logic Evaluations
-    oc_ctrl_bgr_d = NOR2(c_DfT_en_LP_in, NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q), INV(cnt_0_q)), INV(c_metalFix_invert_oc_defaults_in)), NAND2(oc_ctrl_bgr_q, c_metalFix_invert_oc_defaults_in)), INV(c_DfT_oc_dig_VDD_1_in)), NAND2(INV(c_metalFix_invert_oc_defaults_in), c_DfT_oc_dig_VDD_1_in)), INV(c_DfT_oc_dig_VDD_0_in)), NAND2(NAND2(NAND2(c_metalFix_invert_oc_defaults_in, INV(c_DfT_oc_dig_VDD_1_in)), NAND2(NAND2(NAND2(oc_ctrl_bgr_q, INV(c_metalFix_invert_oc_defaults_in)), NAND2(NAND2(NAND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q), INV(cnt_0_q)), c_metalFix_invert_oc_defaults_in)), c_DfT_oc_dig_VDD_1_in)), c_DfT_oc_dig_VDD_0_in)), INV(c_DfT_en_PWM_in)), NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND3(cnt_1_q, cnt_2_q, cnt_3_q), INV(c_metalFix_invert_oc_defaults_in)), NAND2(NAND2(NAND2(NAND4(cnt_0_q, cnt_2_q, cnt_3_q, cnt_1_q), INV(oc_ctrl_bgr_q)), NAND2(INV(NAND4(cnt_0_q, cnt_1_q, cnt_2_q, cnt_3_q)), oc_ctrl_bgr_q)), c_metalFix_invert_oc_defaults_in)), INV(c_DfT_oc_dig_VDD_1_in)), NAND2(INV(c_metalFix_invert_oc_defaults_in), c_DfT_oc_dig_VDD_1_in)), INV(c_DfT_oc_dig_VDD_0_in)), NAND2(NAND2(NAND2(c_metalFix_invert_oc_defaults_in, INV(c_DfT_oc_dig_VDD_1_in)), NAND2(NAND2(NAND2(NAND2(NAND2(NAND4(cnt_0_q, cnt_2_q, cnt_3_q, cnt_1_q), INV(oc_ctrl_bgr_q)), NAND2(INV(NAND4(cnt_0_q, cnt_1_q, cnt_2_q, cnt_3_q)), oc_ctrl_bgr_q)), INV(c_metalFix_invert_oc_defaults_in)), NAND2(NAND3(cnt_1_q, cnt_2_q, cnt_3_q), c_metalFix_invert_oc_defaults_in)), c_DfT_oc_dig_VDD_1_in)), c_DfT_oc_dig_VDD_0_in)), c_DfT_en_PWM_in)));
+    oc_ctrl_bgr_d = NOR2(c_DfT_en_LP_in, NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(INV(cnt_0_q), NAND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q)), INV(c_metalFix_invert_oc_defaults_in)), NAND2(oc_ctrl_bgr_q, c_metalFix_invert_oc_defaults_in)), INV(c_DfT_oc_dig_VDD_1_in)), NAND2(INV(c_metalFix_invert_oc_defaults_in), c_DfT_oc_dig_VDD_1_in)), INV(c_DfT_oc_dig_VDD_0_in)), NAND2(NAND2(NAND2(c_metalFix_invert_oc_defaults_in, INV(c_DfT_oc_dig_VDD_1_in)), NAND2(NAND2(NAND2(oc_ctrl_bgr_q, INV(c_metalFix_invert_oc_defaults_in)), NAND2(NAND2(INV(cnt_0_q), NAND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q)), c_metalFix_invert_oc_defaults_in)), c_DfT_oc_dig_VDD_1_in)), c_DfT_oc_dig_VDD_0_in)), INV(c_DfT_en_PWM_in)), NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND3(cnt_1_q, cnt_2_q, cnt_3_q), INV(c_metalFix_invert_oc_defaults_in)), NAND2(NAND2(NAND2(NAND2(INV(cnt_0_q), NOR3(cnt_1_q, cnt_2_q, cnt_3_q)), INV(oc_ctrl_bgr_q)), NAND2(NOR2(cnt_0_q, INV(NOR3(cnt_1_q, cnt_2_q, cnt_3_q))), oc_ctrl_bgr_q)), c_metalFix_invert_oc_defaults_in)), INV(c_DfT_oc_dig_VDD_1_in)), NAND2(INV(c_metalFix_invert_oc_defaults_in), c_DfT_oc_dig_VDD_1_in)), INV(c_DfT_oc_dig_VDD_0_in)), NAND2(NAND2(NAND2(c_metalFix_invert_oc_defaults_in, INV(c_DfT_oc_dig_VDD_1_in)), NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(INV(cnt_0_q), NOR3(cnt_1_q, cnt_2_q, cnt_3_q)), INV(oc_ctrl_bgr_q)), NAND2(NOR2(cnt_0_q, INV(NOR3(cnt_1_q, cnt_2_q, cnt_3_q))), oc_ctrl_bgr_q)), INV(c_metalFix_invert_oc_defaults_in)), NAND2(NAND3(cnt_1_q, cnt_2_q, cnt_3_q), c_metalFix_invert_oc_defaults_in)), c_DfT_oc_dig_VDD_1_in)), c_DfT_oc_dig_VDD_0_in)), c_DfT_en_PWM_in)));
     cnt_0_d = INV(cnt_0_q);
     cnt_1_d = AOI22(cnt_0_q, cnt_1_q, INV(cnt_0_q), INV(cnt_1_q));
     cnt_2_d = NAND2(NAND2(INV(NAND2(cnt_0_q, cnt_1_q)), INV(cnt_2_q)), NAND2(NAND2(cnt_0_q, cnt_1_q), cnt_2_q));
     cnt_3_d = NAND2(NAND2(INV(NAND3(cnt_0_q, cnt_1_q, cnt_2_q)), INV(cnt_3_q)), NAND2(NAND3(cnt_0_q, cnt_1_q, cnt_2_q), cnt_3_q));
-    startup_d = INV(NAND2(startup_q, NAND4(cnt_0_q, cnt_2_q, cnt_3_q, cnt_1_q)));
+    startup_d = INV(NAND2(startup_q, NAND4(cnt_3_q, cnt_0_q, cnt_1_q, cnt_2_q)));
     eff_oc_mode_0_val = AOI22(c_DfT_oc_dig_VDD_0_in, c_metalFix_invert_oc_defaults_in, INV(c_DfT_oc_dig_VDD_0_in), INV(c_metalFix_invert_oc_defaults_in));
     eff_oc_mode_1_val = AOI22(c_DfT_oc_dig_VDD_1_in, c_metalFix_invert_oc_defaults_in, INV(c_DfT_oc_dig_VDD_1_in), INV(c_metalFix_invert_oc_defaults_in));
     is_az_mode_val = NOR2(eff_oc_mode_0_val, eff_oc_mode_1_val);
@@ -259,7 +259,7 @@ module PWM_CTRL (VDD, VSS, sub, res_n, c_DfT_en_LP, c_DfT_en_PWM, c_DfT_oc_dig_V
     oc_ctrl_cp_ext_val = oc_ctrl_cp_val;
     en_LP_val = INV(AOI21(c_DfT_en_PWM_in, INV(is_pwm_active_window_val), c_DfT_en_LP_in));
     en_LP_ext_val = en_LP_val;
-    en_lowFreq_val = NOR2(c_DfT_en_LP_in, NAND2(NAND2(NAND4(NAND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q), is_az_mode_val, INV(is_chop_mode_val), INV(cnt_0_q)), INV(c_DfT_en_PWM_in)), NAND2(is_pwm_active_window_val, c_DfT_en_PWM_in)));
+    en_lowFreq_val = NOR2(c_DfT_en_LP_in, NAND2(NAND2(NAND4(is_az_mode_val, INV(cnt_0_q), NAND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q), INV(is_chop_mode_val)), INV(c_DfT_en_PWM_in)), NAND2(is_pwm_active_window_val, c_DfT_en_PWM_in)));
 
     // Analog Electrical Output Drivers
     V(en_LP) <+ transition((en_LP_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);
