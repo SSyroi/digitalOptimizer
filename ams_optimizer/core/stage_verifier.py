@@ -95,15 +95,16 @@ class StageByStageVerifier:
         # 2. Sweep all stimulus vectors across stages
         for vec_idx, stimulus in enumerate(vectors):
             # Check if this vector represents an unreachable FSM state
-            is_unreachable = False
-            for reg in self.dag.registers.values():
-                if "state" in reg.name and unreachable_states:
-                    st_val = 0
-                    for b in range(reg.width):
-                        st_val |= (stimulus.get(f"{reg.name}[{b}]", 0) << b)
-                    if st_val in unreachable_states:
-                        is_unreachable = True
-                        break
+            is_unreachable = self.reachability.is_unreachable_stimulus(stimulus)
+            if not is_unreachable and unreachable_states:
+                for reg in self.dag.registers.values():
+                    if "state" in reg.name:
+                        st_val = 0
+                        for b in range(reg.width):
+                            st_val |= (stimulus.get(f"{reg.name}[{b}]", 0) << b)
+                        if st_val in unreachable_states:
+                            is_unreachable = True
+                            break
 
             # -------------------------------------------------------------
             # Stage 1: Evaluate Multi-Level DAG

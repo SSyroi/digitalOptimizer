@@ -114,3 +114,10 @@ class FSMReachabilityAnalyzer:
             st_val |= (bit_val << i)
             
         return st_val not in self.reachable_states
+
+    def get_unreachable_states(self) -> Set[int]:
+        if not self.reachable_states or len(self.reg_bit_names) == 0:
+            return set()
+        total = 1 << len(self.reg_bit_names)
+        return set(range(total)) - self.reachable_states
+

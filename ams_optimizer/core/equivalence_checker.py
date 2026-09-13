@@ -60,6 +60,20 @@ class StandardCellEvaluator:
             b = args[1] if len(args) > 1 else 0
             c = args[2] if len(args) > 2 else 0
             return 0 if ((a or b) and c) else 1
+        elif cell == "AOI22":
+            # AOI22(a, b, c, d): Y = ~((a & b) | (c & d))
+            a = args[0] if len(args) > 0 else 0
+            b = args[1] if len(args) > 1 else 0
+            c = args[2] if len(args) > 2 else 0
+            d = args[3] if len(args) > 3 else 0
+            return 0 if ((a and b) or (c and d)) else 1
+        elif cell == "OAI22":
+            # OAI22(a, b, c, d): Y = ~((a | b) & (c | d))
+            a = args[0] if len(args) > 0 else 0
+            b = args[1] if len(args) > 1 else 0
+            c = args[2] if len(args) > 2 else 0
+            d = args[3] if len(args) > 3 else 0
+            return 0 if ((a or b) and (c or d)) else 1
         elif cell == "NAND3":
             return 0 if ((args[0] if len(args) > 0 else 0) and (args[1] if len(args) > 1 else 0) and (args[2] if len(args) > 2 else 0)) else 1
         elif cell == "AND3":

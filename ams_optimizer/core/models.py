@@ -163,6 +163,9 @@ TRANSISTOR_COST = {
     "MUX2": 12,   # 12T Static CMOS MUX2 (6 inverters)
     "AOI21": 6,   # 6T Single-stage compound gate
     "OAI21": 6,   # 6T Single-stage compound gate
+    "AOI22": 8,   # 8T Compound gate (4 GE)
+    "OAI22": 8,   # 8T Compound gate (4 GE)
+    "BUFFER": 4,  # 4T Non-inverting buffer (2 inverters)
     "DFFR": 34,   # 34T Flip-Flop with Reset (17 inverters)
     "DFFS": 34,   # 34T Flip-Flop with Set (17 inverters)
     "DFF": 34,    # 34T Flip-Flop (17 inverters)
@@ -171,6 +174,7 @@ TRANSISTOR_COST = {
 # Equivalent Inverter Count (Gate Equivalent - GE: 1 Inverter = 2 Transistors = 1.0 GE)
 INVERTER_EQUIVALENTS = {
     "INV": 1.0,   # 2T / 2T = 1.0 Inverter
+    "BUFFER": 2.0,# 4T / 2T = 2.0 Inverters
     "NAND2": 2.0, # 4T / 2T = 2.0 Inverters
     "NOR2": 2.0,  # 4T / 2T = 2.0 Inverters
     "AND2": 3.0,  # 6T / 2T = 3.0 Inverters
@@ -187,6 +191,8 @@ INVERTER_EQUIVALENTS = {
     "MUX2": 6.0,  # 12T / 2T = 6.0 Inverters
     "AOI21": 3.0, # 6T / 2T = 3.0 Inverters
     "OAI21": 3.0, # 6T / 2T = 3.0 Inverters
+    "AOI22": 4.0, # 8T / 2T = 4.0 Inverters
+    "OAI22": 4.0, # 8T / 2T = 4.0 Inverters
     "DFFR": 17.0, # 34T / 2T = 17.0 Inverters
     "DFFS": 17.0, # 34T / 2T = 17.0 Inverters
     "DFF": 17.0,  # 34T / 2T = 17.0 Inverters
