@@ -211,7 +211,7 @@ To achieve maximum optimization and prevent issues when synthesizing with the AM
 # Standard automated optimization sweep (48 configurations, formally verified winner)
 python3 -m ams_optimizer.cli examples/PWM_CTRL_relaxed.v \
   --auto-sweep \
-  -o examples/PWM_CTRL_relaxed_va.va \
+  -o examples/PWM_CTRL_relaxed.va \
   --save-netlist examples/PWM_CTRL_relaxed_netlist.json \
   --save-skill examples/PWM_CTRL_relaxed_schematic.il \
   --save-report examples/PWM_CTRL_relaxed_report.txt \

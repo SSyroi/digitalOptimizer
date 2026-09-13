@@ -73,7 +73,7 @@ The optimizer includes a built-in **Two-Phase Parameter Sweep** that exhaustivel
 # Automatically sweep 48 configurations, formally verify winner, and save all outputs:
 python3 -m ams_optimizer.cli examples/PWM_CTRL_relaxed.v \
   --auto-sweep \
-  -o examples/PWM_CTRL_relaxed_va.va \
+  -o examples/PWM_CTRL_relaxed.va \
   --save-netlist examples/PWM_CTRL_relaxed_netlist.json \
   --save-skill examples/PWM_CTRL_relaxed_schematic.il \
   --save-report examples/PWM_CTRL_relaxed_report.txt \
@@ -110,12 +110,12 @@ To reproduce specific winning architectural trade-offs directly without running 
 # 1. Minimum Silicon Area (322.0 GE, 644T, cs019sw-compatible pure CMOS):
 python3 ams_optimizer/cli.py examples/PWM_CTRL_relaxed.v \
   --no-and-or --no-mux --qm-max 7 --shannon-min 3 --no-buffers \
-  -o examples/PWM_CTRL_relaxed_va.va
+  -o examples/PWM_CTRL_relaxed.va
 
 # 2. Minimum Cell Count (88 cells, 325.0 GE, 650T):
 python3 ams_optimizer/cli.py examples/PWM_CTRL_relaxed.v \
   --no-and-or --allow-mux --qm-max 7 --shannon-min 3 --no-buffers \
-  -o examples/PWM_CTRL_relaxed_va.va
+  -o examples/PWM_CTRL_relaxed.va
 ```
 
 #### Via Python API:
@@ -280,7 +280,7 @@ No installation needed. Run directly with Python 3.9+:
 # 1. Standard Execution: Run automated 48-configuration sweep, formally verify, and save all outputs:
 python3 -m ams_optimizer.cli examples/PWM_CTRL_relaxed.v \
   --auto-sweep \
-  -o examples/PWM_CTRL_relaxed_va.va \
+  -o examples/PWM_CTRL_relaxed.va \
   --save-netlist examples/PWM_CTRL_relaxed_netlist.json \
   --save-skill examples/PWM_CTRL_relaxed_schematic.il \
   --save-report examples/PWM_CTRL_relaxed_report.txt \
@@ -337,7 +337,7 @@ digitalOptimizer/
 ├── examples/                  # Benchmark RTL, Verilog-A models & JSON netlists
 │   ├── PWM_CTRL_flexible.v    # Synthesizable RTL with configurable don't-care parameters
 │   ├── PWM_CTRL_relaxed.v     # Relaxed RTL with verified physical timing constraints
-│   ├── PWM_CTRL_relaxed_va.va # Winning Cadence Spectre Verilog-A model (322.0 GE)
+│   ├── PWM_CTRL_relaxed.va    # Winning Cadence Spectre Verilog-A model (322.0 GE)
 │   ├── PWM_CTRL_relaxed_netlist.json # Winning structural gate netlist
 │   ├── PWM_CTRL_relaxed_schematic.il # Winning Virtuoso SKILL schematic script
 │   ├── PWM_CTRL_relaxed_report.txt   # Winning synthesis BOM report
