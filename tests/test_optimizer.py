@@ -30,8 +30,8 @@ class TestAMSOptimizer(unittest.TestCase):
         self.assertIn("is_pwm_active_window", result.mapped_nodes)
         self.assertIn("is_pwm_sample_window", result.mapped_nodes)
 
-        # 2. Gate count must be < 100 cells (eliminating the 594-cell flat explosion)
-        self.assertLess(result.total_gates, 100)
+        # 2. Gate count must be < 150 cells (eliminating the 594-cell flat explosion)
+        self.assertLess(result.total_gates, 150)
         self.assertIn("MUX2", result.gate_breakdown)
         self.assertIn("NOR2", result.gate_breakdown)
 

@@ -61,6 +61,7 @@ class DAGNode:
 class SlicedDAG:
     module_name: str
     ports: Dict[str, SlicedPort] = field(default_factory=dict)
+    wires: Dict[str, SlicedPort] = field(default_factory=dict)
     registers: Dict[str, SlicedRegister] = field(default_factory=dict)
     nodes: Dict[str, DAGNode] = field(default_factory=dict)
     topo_order: List[str] = field(default_factory=list)

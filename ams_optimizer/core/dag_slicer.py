@@ -12,7 +12,15 @@ import re
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from .models import SlicedPort, SlicedRegister, DAGNode, SlicedDAG
-from .rtl_simulator import RTLCombinationalSimulator
+from .rtl_simulator import (
+    RTLCombinationalSimulator,
+    VerilogExprEvaluator,
+    VerilogProceduralParser,
+    Stmt,
+    AssignStmt,
+    IfStmt,
+    CaseStmt,
+)
 
 
 
@@ -90,6 +98,17 @@ class VerilogDAGSlicer:
                 if p_name and p_name not in dag.ports:
                     dag.ports[p_name] = SlicedPort(name=p_name, direction=p_dir, width=width, msb=msb, lsb=lsb)
 
+        # Wire declarations for internal nets
+        for match in re.finditer(r"\bwire\s+(?:\[(\d+)\s*:\s*(\d+)\]\s+)?([^;]+);", self.clean_code):
+            msb = int(match.group(1)) if match.group(1) is not None else 0
+            lsb = int(match.group(2)) if match.group(2) is not None else 0
+            width = abs(msb - lsb) + 1 if match.group(1) is not None else 1
+            names = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", match.group(3))
+            names = [n for n in names if n not in ("wire", "logic", "signed", "unsigned")]
+            for w_name in names:
+                if w_name and w_name not in dag.ports:
+                    dag.wires[w_name] = SlicedPort(name=w_name, direction="wire", width=width, msb=msb, lsb=lsb)
+
         # Reg declarations for registers
         for match in re.finditer(r"\breg\s+(?:\[(\d+)\s*:\s*(\d+)\]\s+)?([^;]+);", self.clean_code):
             msb = int(match.group(1)) if match.group(1) is not None else 0
@@ -160,6 +179,22 @@ class VerilogDAGSlicer:
                     r.is_async_reset = True
                     r.is_active_low_reset = (rst_edge == "negedge")
 
+            # Parse reset values from the reset branch (e.g. if (!res_n) ... else ...)
+            if rst_sig:
+                rst_branch_m = re.search(
+                    rf"if\s*\(\s*(?:!\s*{re.escape(rst_sig)}|~{re.escape(rst_sig)}|{re.escape(rst_sig)}\s*==\s*1'b0|{re.escape(rst_sig)})\s*\)\s*begin(.*?)end",
+                    body,
+                    re.DOTALL
+                )
+                if rst_branch_m:
+                    rst_body = rst_branch_m.group(1)
+                    for assign_m in re.finditer(r"([A-Za-z_][A-Za-z0-9_]*)\s*<=\s*([^;]+);", rst_body):
+                        tgt = assign_m.group(1).strip()
+                        val_str = assign_m.group(2).strip()
+                        parsed_val = _parse_int_val(val_str)
+                        if tgt in dag.registers:
+                            dag.registers[tgt].reset_val = parsed_val
+
             # Extract non-blocking assignments <=
             self._extract_register_next_states(dag, body)
 
@@ -171,20 +206,73 @@ class VerilogDAGSlicer:
                 node_name = f"{b_name}_d"
                 self._synthesize_generic_reg_d(dag, r_name, reg, bit_idx, body)
 
+    def _get_reg_dependencies(self, dag: SlicedDAG, r_name: str, body: str) -> List[str]:
+        reg = dag.registers.get(r_name)
+        needed_vars: Set[str] = set()
+        if reg:
+            needed_vars.update(reg.bit_names)
+
+        # Parse procedural statements of active body
+        else_match = re.search(r"\belse\b", body)
+        active_body = body[else_match.end():].strip() if else_match else body
+
+        parser = VerilogProceduralParser(active_body)
+        stmts = parser.parse_statements(active_body)
+
+        def find_assigned_deps(stmt_list: List[Stmt], target: str) -> Tuple[bool, Set[str]]:
+            assigns = False
+            deps: Set[str] = set()
+            for stmt in stmt_list:
+                if isinstance(stmt, AssignStmt):
+                    if stmt.target_name == target:
+                        assigns = True
+                        for tok in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", stmt.expr_str):
+                            deps.add(tok)
+                elif isinstance(stmt, IfStmt):
+                    then_assigns, then_deps = find_assigned_deps(stmt.then_stmts, target)
+                    else_assigns, else_deps = find_assigned_deps(stmt.else_stmts, target)
+                    if then_assigns or else_assigns:
+                        assigns = True
+                        deps.update(then_deps)
+                        deps.update(else_deps)
+                        for tok in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", stmt.cond_str):
+                            deps.add(tok)
+                elif isinstance(stmt, CaseStmt):
+                    case_assigns = False
+                    for val_eval, branch_stmts in stmt.branches:
+                        b_assigns, b_deps = find_assigned_deps(branch_stmts, target)
+                        if b_assigns:
+                            case_assigns = True
+                            deps.update(b_deps)
+                    d_assigns, d_deps = find_assigned_deps(stmt.default_stmts, target)
+                    if d_assigns:
+                        case_assigns = True
+                        deps.update(d_deps)
+                    if case_assigns or d_assigns:
+                        assigns = True
+                        for tok in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", stmt.expr_str):
+                            deps.add(tok)
+            return assigns, deps
+
+        assigns, raw_deps = find_assigned_deps(stmts, r_name)
+        for tok in raw_deps:
+            base_tok = tok.split("[")[0]
+            if base_tok in dag.registers:
+                needed_vars.update(dag.registers[base_tok].bit_names)
+            elif base_tok in dag.ports and dag.ports[base_tok].direction == "input":
+                needed_vars.update(dag.ports[base_tok].bit_names)
+
+        clock_sig = reg.clock_signal if reg else "clk"
+        reset_sig = reg.reset_signal if reg else "rst_n"
+        deps = [v for v in needed_vars if v not in ("clk", "rst_n", "rst", "reset", clock_sig, reset_sig)]
+        return sorted(deps) if deps else [p for p in dag.primary_inputs if p not in ("clk", "rst_n", "rst", "reset")] + dag.register_q_bits
+
     def _synthesize_generic_reg_d(self, dag: SlicedDAG, r_name: str, reg: SlicedRegister, bit_idx: int, body: str):
         """Builds next-state evaluator for FSM state registers and general registers using RTL simulator."""
         b_name = f"{r_name}[{bit_idx}]" if reg.width > 1 else r_name
         node_name = f"{b_name}_d"
 
-        # Determine candidate inputs
-        candidate_inputs = []
-        for p in dag.primary_inputs:
-            if p not in ("clk", "rst_n", "rst", "reset"):
-                candidate_inputs.append(p)
-        for r in dag.registers.values():
-            for b in r.bit_names:
-                if b not in candidate_inputs:
-                    candidate_inputs.append(b)
+        candidate_inputs = self._get_reg_dependencies(dag, r_name, body)
 
         if not hasattr(self, "_rtl_sim") or self._rtl_sim is None:
             self._rtl_sim = RTLCombinationalSimulator(self.raw_code)
@@ -241,10 +329,10 @@ class VerilogDAGSlicer:
                     )
 
     def _create_assign_node(self, dag: SlicedDAG, lhs: str, rhs: str):
-        # Case A: Vector assign (e.g. assign count = cnt_reg; or assign count_bin = q;)
+        # Case A: Pure Vector alias (e.g. assign count = cnt_reg; or assign count_bin = q;)
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", lhs) and re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", rhs):
-            lhs_port = dag.ports.get(lhs)
-            rhs_reg = dag.registers.get(rhs) or dag.ports.get(rhs)
+            lhs_port = dag.ports.get(lhs) or dag.wires.get(lhs)
+            rhs_reg = dag.registers.get(rhs) or dag.ports.get(rhs) or dag.wires.get(rhs)
             if lhs_port and lhs_port.width > 1:
                 for i in range(lhs_port.width):
                     b_lhs = f"{lhs}[{i}]"
@@ -259,187 +347,153 @@ class VerilogDAGSlicer:
                     )
                 return
 
-        # Case B: Bitwise expressions (e.g. count_gray[1] = q[2] ^ q[1];)
-        inputs = re.findall(r"[A-Za-z_][A-Za-z0-9_]*(?:\[\d+\])?", rhs)
+        evaluator = VerilogExprEvaluator(rhs)
 
-        def make_assign_eval(expression: str, in_list: List[str]):
-            def _eval(inputs_dict: Dict[str, int]) -> int:
-                e = expression
-                # Replace vectors accurately without \b breaking on ]
-                for inp_name in sorted(in_list, key=len, reverse=True):
-                    val = inputs_dict.get(inp_name, 0)
-                    pattern = rf"(?<![A-Za-z0-9_]){re.escape(inp_name)}(?![A-Za-z0-9_])"
-                    e = re.sub(pattern, str(val), e)
-                # Translate Verilog operators to Python
-                e = e.replace("^", "^").replace("&", "&").replace("|", "|").replace("~", " 1^")
-                try:
-                    return 1 if eval(e) else 0
-                except Exception:
-                    return 0
-            return _eval
+        # Extract variable dependencies from rhs tokens
+        in_names: Set[str] = set()
+        tokens = evaluator.tokens
+        for i, (tok_type, tok_txt) in enumerate(tokens):
+            if tok_type == "ID":
+                if i + 3 < len(tokens) and tokens[i+1][1] == "[" and tokens[i+3][1] == "]":
+                    bit_str = tokens[i+2][1]
+                    in_names.add(f"{tok_txt}[{bit_str}]")
+                else:
+                    port_or_wire = dag.ports.get(tok_txt) or dag.wires.get(tok_txt)
+                    reg = dag.registers.get(tok_txt)
+                    if port_or_wire and port_or_wire.width > 1:
+                        in_names.update(port_or_wire.bit_names)
+                    elif reg and reg.width > 1:
+                        in_names.update(reg.bit_names)
+                    else:
+                        in_names.add(tok_txt)
+
+        valid_inputs = [
+            n for n in in_names
+            if n in dag.nodes or n in dag.primary_inputs or n in dag.register_q_bits
+            or any(n.startswith(f"{p}[") for p in dag.primary_inputs)
+            or any(n.startswith(f"{r}[") for r in dag.registers)
+            or n in dag.ports or n in dag.wires
+        ]
+        if not valid_inputs:
+            valid_inputs = list(in_names)
+
+        port_or_wire = dag.ports.get(lhs) or dag.wires.get(lhs)
+        if port_or_wire and port_or_wire.width > 1:
+            for bit_i in range(port_or_wire.width):
+                b_lhs = f"{lhs}[{bit_i}]"
+                dag.nodes[b_lhs] = DAGNode(
+                    name=b_lhs,
+                    node_type="primary_output" if b_lhs in dag.primary_outputs else "intermediate",
+                    inputs=sorted(valid_inputs),
+                    eval_fn=lambda inp, idx=bit_i, ev=evaluator: (ev.evaluate(inp) >> idx) & 1,
+                    level=1,
+                    raw_expr=f"({rhs})[{bit_i}]"
+                )
+            return
 
         node_type = "primary_output" if lhs in dag.primary_outputs else "intermediate"
         dag.nodes[lhs] = DAGNode(
             name=lhs,
             node_type=node_type,
-            inputs=inputs,
-            eval_fn=make_assign_eval(rhs, inputs),
+            inputs=sorted(valid_inputs),
+            eval_fn=lambda inp, ev=evaluator: 1 if ev.evaluate(inp) else 0,
             level=1,
             raw_expr=rhs
         )
 
     def _parse_comb_always_body(self, dag: SlicedDAG, body: str):
-        """Parses multi-level statements like eff_oc_mode = c_DfT_oc_dig_VDD; is_az_mode = ...; if/else."""
-        # 1. Parse simple intermediate assignments: name = expr;
-        for assign_match in re.finditer(r"([A-Za-z_][A-Za-z0-9_]*(?:\[\d+\])?)\s*=\s*([^;]+);", body):
-            lhs = assign_match.group(1).strip()
-            rhs = assign_match.group(2).strip()
-            self._build_intermediate_condition_node(dag, lhs, rhs)
+        """Parses combinational always @(*) blocks with arbitrary nested procedural logic."""
+        parser = VerilogProceduralParser(body)
+        stmts = parser.parse_statements(body)
 
-        # 2. Parse multiplexed if/else output blocks (like PWM_CTRL mode multiplexing)
-        if "if (is_az_mode)" in body or "if" in body:
-            self._build_multiplexed_output_nodes(dag, body)
+        def _find_targets(s_list: List[Stmt]) -> Set[str]:
+            res = set()
+            for s in s_list:
+                if isinstance(s, AssignStmt):
+                    res.add(s.target_name)
+                elif isinstance(s, IfStmt):
+                    res.update(_find_targets(s.then_stmts))
+                    res.update(_find_targets(s.else_stmts))
+                elif isinstance(s, CaseStmt):
+                    for _, b_stmts in s.branches:
+                        res.update(_find_targets(b_stmts))
+                    res.update(_find_targets(s.default_stmts))
+            return res
 
-    def _build_intermediate_condition_node(self, dag: SlicedDAG, lhs: str, rhs: str):
-        # Case 1: Vector alias (eff_oc_mode = c_DfT_oc_dig_VDD)
-        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", rhs):
-            for p in dag.ports.values():
-                if p.name == rhs and p.width > 1:
-                    for i in range(p.width):
-                        bit_lhs = f"{lhs}[{i}]"
-                        bit_rhs = f"{rhs}[{i}]"
-                        dag.nodes[bit_lhs] = DAGNode(
-                            name=bit_lhs,
-                            node_type="intermediate",
-                            inputs=[bit_rhs],
-                            eval_fn=lambda inp, r=bit_rhs: inp.get(r, 0),
-                            level=1,
-                            raw_expr=bit_rhs
-                        )
-                    return
-            dag.nodes[lhs] = DAGNode(
-                name=lhs,
-                node_type="intermediate",
-                inputs=[rhs],
-                eval_fn=lambda inp, r=rhs: inp.get(r, 0),
-                level=1,
-                raw_expr=rhs
-            )
-            return
+        all_targets = _find_targets(stmts)
+        all_targets = {t for t in all_targets if t not in dag.registers}
 
-        # Case 2: Equality comparison (is_az_mode = (eff_oc_mode == 2'b00))
-        eq_match = re.search(r"\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*==\s*(\d+'[bhd]\d+|\d+)\s*\)", rhs)
-        if eq_match:
-            var_name = eq_match.group(1)
-            target_val = _parse_int_val(eq_match.group(2))
-            
-            var_bits = []
-            for p in dag.ports.values():
-                if p.name == var_name:
-                    var_bits = p.bit_names
-            if not var_bits:
-                var_bits = [f"{var_name}[0]", f"{var_name}[1]"]
+        def _extract_signals_for_target(s_list: List[Stmt], tgt: str) -> Set[str]:
+            used = set()
+            for s in s_list:
+                if isinstance(s, AssignStmt):
+                    if s.target_name == tgt:
+                        for m in re.finditer(r"[A-Za-z_][A-Za-z0-9_]*(?:\[\d+\])?", s.expr_str):
+                            used.add(m.group(0))
+                elif isinstance(s, IfStmt):
+                    then_used = _extract_signals_for_target(s.then_stmts, tgt)
+                    else_used = _extract_signals_for_target(s.else_stmts, tgt)
+                    if then_used or else_used:
+                        used.update(then_used)
+                        used.update(else_used)
+                        for m in re.finditer(r"[A-Za-z_][A-Za-z0-9_]*(?:\[\d+\])?", s.cond_str):
+                            used.add(m.group(0))
+                elif isinstance(s, CaseStmt):
+                    case_used = set()
+                    for _, b_stmts in s.branches:
+                        case_used.update(_extract_signals_for_target(b_stmts, tgt))
+                    case_used.update(_extract_signals_for_target(s.default_stmts, tgt))
+                    if case_used:
+                        used.update(case_used)
+                        for m in re.finditer(r"[A-Za-z_][A-Za-z0-9_]*(?:\[\d+\])?", s.expr_str):
+                            used.add(m.group(0))
+            return used
 
-            def make_eq_eval(bits: List[str], target: int):
-                def _eval(inp: Dict[str, int]) -> int:
-                    val = 0
-                    for b in bits:
-                        m = re.search(r"\[(\d+)\]", b)
-                        b_idx = int(m.group(1)) if m else 0
-                        val |= (inp.get(b, 0) << b_idx)
-                    return 1 if (val == target) else 0
-                return _eval
-
-            dag.nodes[lhs] = DAGNode(
-                name=lhs,
-                node_type="intermediate",
-                inputs=var_bits,
-                eval_fn=make_eq_eval(var_bits, target_val),
-                level=1,
-                raw_expr=rhs
-            )
-            return
-
-        # Case 3: Window / Range comparison (is_pwm_active_window = (cnt >= 4'd2 && cnt <= 4'd12))
-        range_match = re.search(r"\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*>=\s*(\d+'[bhd]\d+|\d+)\s*&&\s*\1\s*<=\s*(\d+'[bhd]\d+|\d+)\s*\)", rhs)
-        if range_match:
-            var_name = range_match.group(1)
-            min_val = _parse_int_val(range_match.group(2))
-            max_val = _parse_int_val(range_match.group(3))
-            
-            var_bits = [f"{var_name}[{i}]" for i in range(4)]
-
-            def make_range_eval(bits: List[str], low: int, high: int):
-                def _eval(inp: Dict[str, int]) -> int:
-                    val = 0
-                    for idx, b in enumerate(bits):
-                        val |= (inp.get(b, 0) << idx)
-                    return 1 if (low <= val <= high) else 0
-                return _eval
-
-            dag.nodes[lhs] = DAGNode(
-                name=lhs,
-                node_type="intermediate",
-                inputs=var_bits,
-                eval_fn=make_range_eval(var_bits, min_val, max_val),
-                level=1,
-                raw_expr=rhs
-            )
-            return
-
-    def _build_multiplexed_output_nodes(self, dag: SlicedDAG, body: str):
-        """Dynamically builds multiplexer logic for primary outputs from arbitrary if-else trees."""
-        branches: List[Tuple[Optional[str], Dict[str, str]]] = []
-        # Find if (...) begin ... end, else if (...) begin ... end, else begin ... end
-        for m in re.finditer(r"(?:(else\s+if|if)\s*\((.*?)\)\s*begin|else\s*begin)(.*?)end", body, re.DOTALL):
-            cond = m.group(2).strip() if m.group(2) else None
-            content = m.group(3)
-            assigns = dict(re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;]+);", content))
-            branches.append((cond, assigns))
-
-        all_targets: Set[str] = set()
-        for _, assigns in branches:
-            all_targets.update(assigns.keys())
+        # Available signals in DAG
+        available = set(dag.primary_inputs) | set(dag.register_q_bits) | set(dag.nodes.keys())
+        for port in dag.ports.values():
+            if port.width > 1:
+                available.update(port.bit_names)
+        for w in dag.wires.values():
+            if w.width > 1:
+                available.update(w.bit_names)
 
         for out in all_targets:
-            # Find all rules for this output
-            v_rules = [(c, a[out].strip()) for c, a in branches if c and out in a]
-            else_val_list = [a[out].strip() for c, a in branches if not c and out in a]
-            else_val = else_val_list[0] if else_val_list else "0"
+            raw_deps = _extract_signals_for_target(stmts, out)
+            expanded_deps: Set[str] = set()
+            for d in raw_deps:
+                base_d = d.split("[")[0]
+                port_or_wire = dag.ports.get(base_d) or dag.wires.get(base_d)
+                reg = dag.registers.get(base_d)
+                if "[" in d:
+                    if d in available or d in dag.nodes:
+                        expanded_deps.add(d)
+                elif port_or_wire and port_or_wire.width > 1:
+                    expanded_deps.update([b for b in port_or_wire.bit_names if b in available or b in dag.nodes])
+                elif reg and reg.width > 1:
+                    expanded_deps.update([b for b in reg.bit_names if b in available or b in dag.register_q_bits])
+                elif d in available or d in dag.nodes:
+                    expanded_deps.add(d)
 
-            # Collect dependent inputs from conditions and expressions
-            dep_inputs: List[str] = []
-            for cond, expr in v_rules:
-                for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", cond):
-                    if (token in dag.nodes or token in dag.primary_inputs) and token not in dep_inputs:
-                        dep_inputs.append(token)
-                for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expr):
-                    if (token in dag.nodes or token in dag.primary_inputs) and token not in dep_inputs:
-                        dep_inputs.append(token)
-            for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", else_val):
-                if (token in dag.nodes or token in dag.primary_inputs) and token not in dep_inputs:
-                    dep_inputs.append(token)
+            # Safety fallback: if expanded_deps is empty, search tokens in body
+            if not expanded_deps:
+                for tok in re.findall(r"[A-Za-z_][A-Za-z0-9_]*(?:\[\d+\])?", body):
+                    if (tok in available or tok in dag.nodes) and tok != out:
+                        expanded_deps.add(tok)
 
-            def make_branch_eval(rules: List[Tuple[str, str]], fallback: str):
-                def _eval_token(tok: str, inp: Dict[str, int]) -> int:
-                    if tok in ("1'b1", "1", "1'd1"):
-                        return 1
-                    if tok in ("1'b0", "0", "1'd0"):
-                        return 0
-                    return inp.get(tok, 0)
-
+            def make_comb_eval(tgt: str, statements: List[Stmt]):
                 def _eval(inp: Dict[str, int]) -> int:
-                    for c_expr, v_expr in rules:
-                        if _eval_token(c_expr, inp):
-                            return _eval_token(v_expr, inp)
-                    return _eval_token(fallback, inp)
+                    env = dict(inp)
+                    for s in statements:
+                        s.execute(env, env)
+                    return env.get(tgt, 0)
                 return _eval
 
             dag.nodes[out] = DAGNode(
                 name=out,
                 node_type="primary_output" if out in dag.primary_outputs else "intermediate",
-                inputs=dep_inputs,
-                eval_fn=make_branch_eval(v_rules, else_val),
+                inputs=sorted(expanded_deps),
+                eval_fn=make_comb_eval(out, stmts),
                 level=2,
                 raw_expr=f"MUX({out})"
             )

@@ -85,6 +85,13 @@ class StageByStageVerifier:
         # Precompute local truth tables once for all DAG nodes
         node_tts = {name: self.tt_evaluator.evaluate_node(node) for name, node in self.dag.nodes.items()}
 
+        # Precompile mapped and Verilog-A expressions for Stage 3 & Stage 4
+        compiled_mapped = {name: StandardCellEvaluator.compile_expr(m.expression) for name, m in self.mapped_nodes.items()}
+        compiled_va = {}
+        for name, m in self.mapped_nodes.items():
+            expr_va = va_emitter._format_veriloga_expr(m.expression)
+            compiled_va[name] = StandardCellEvaluator.compile_expr(expr_va)
+
         # 2. Sweep all stimulus vectors across stages
         for vec_idx, stimulus in enumerate(vectors):
             # Check if this vector represents an unreachable FSM state
@@ -107,8 +114,8 @@ class StageByStageVerifier:
                 if node:
                     try:
                         env_dag[node_name] = node.eval_fn(env_dag)
-                    except Exception:
-                        env_dag[node_name] = 0
+                    except Exception as e:
+                        raise RuntimeError(f"DAG node '{node_name}' stage 1 eval_fn failed: {e}") from e
 
             s1_pass = True
             for sig in check_signals:
@@ -169,9 +176,9 @@ class StageByStageVerifier:
             # -------------------------------------------------------------
             env_mapped = dict(stimulus)
             for node_name in self.dag.topo_order:
-                mapped = self.mapped_nodes.get(node_name)
-                if mapped:
-                    env_mapped[node_name] = StandardCellEvaluator.eval_expr(mapped.expression, env_mapped)
+                eval_fn = compiled_mapped.get(node_name)
+                if eval_fn:
+                    env_mapped[node_name] = eval_fn(env_mapped)
                 elif node_name in env_dag:
                     env_mapped[node_name] = env_dag[node_name]
 
@@ -197,9 +204,10 @@ class StageByStageVerifier:
             # -------------------------------------------------------------
             # Stage 4: Evaluate Cadence Verilog-A Behavioral Model
             # -------------------------------------------------------------
-            env_va = {}
+            env_va = {"vhigh": 1, "vlow": 0}
             for p in self.dag.primary_inputs:
                 env_va[f"V({p})"] = stimulus.get(p, 0)
+                env_va[p] = stimulus.get(p, 0)
             for r_name, r in self.dag.registers.items():
                 for bit_i in range(r.width):
                     b_key = f"{r_name}[{bit_i}]" if r.width > 1 else r_name
@@ -208,10 +216,9 @@ class StageByStageVerifier:
 
             for node_name in self.dag.topo_order:
                 node = self.dag.nodes.get(node_name)
-                mapped = self.mapped_nodes.get(node_name)
-                if node and mapped:
-                    expr_va = va_emitter._format_veriloga_expr(mapped.expression)
-                    val = StandardCellEvaluator.eval_expr(expr_va, env_va)
+                eval_fn = compiled_va.get(node_name)
+                if node and eval_fn:
+                    val = eval_fn(env_va)
                     if node.node_type == "register_d":
                         d_var = node_name.replace("[", "_").replace("]", "")
                         env_va[d_var] = val

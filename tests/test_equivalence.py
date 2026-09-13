@@ -28,8 +28,8 @@ class TestEquivalenceChecker(unittest.TestCase):
         eq = result.equivalence_result
         self.assertTrue(eq.passed, f"PWM_CTRL verification failed: {eq.mismatches}")
         self.assertEqual(len(eq.mismatches), 0)
-        self.assertEqual(eq.total_vectors, 512)
-        self.assertEqual(eq.matching_vectors, 512)
+        self.assertEqual(eq.total_vectors, 4096)
+        self.assertEqual(eq.matching_vectors, 4096)
         self.assertIn("en_LP", eq.verified_signals)
         self.assertIn("oc_select", eq.verified_signals)
 

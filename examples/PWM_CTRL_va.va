@@ -7,53 +7,60 @@
 // Cadence Spectre & Virtuoso Compatible Verilog-A Model
 //
 // Circuit Complexity & Silicon Area Notes:
-//   - Total Gate Count         : 50 cells
-//   - Inverter Equivalents (GE) : 151.0 inverters (1 GE = 1 Inverter = 2 Transistors)
-//   - Est. Transistor Count    : ~302 transistors
+//   - Total Gate Count         : 134 cells
+//   - Inverter Equivalents (GE) : 410.0 inverters (1 GE = 1 Inverter = 2 Transistors)
+//   - Est. Transistor Count    : ~820 transistors
 //
 // Standard Cell Breakdown (Gate Counts & Inverter Weights):
-//   - AND2    :  13 cells ( 39.0 inverters eq.,   78 transistors)
-//   - AND3    :   3 cells ( 12.0 inverters eq.,   24 transistors)
-//   - DFFR    :   4 cells ( 32.0 inverters eq.,   64 transistors)
-//   - INV     :  12 cells ( 12.0 inverters eq.,   24 transistors)
-//   - MUX2    :   6 cells ( 18.0 inverters eq.,   36 transistors)
-//   - NAND2   :   1 cells (  2.0 inverters eq.,    4 transistors)
-//   - NAND3   :   1 cells (  3.0 inverters eq.,    6 transistors)
+//   - AND2    :  14 cells ( 42.0 inverters eq.,   84 transistors)
+//   - AND3    :   2 cells (  8.0 inverters eq.,   16 transistors)
+//   - DFFR    :   7 cells ( 56.0 inverters eq.,  112 transistors)
+//   - INV     :  14 cells ( 14.0 inverters eq.,   28 transistors)
+//   - MUX2    :  77 cells (231.0 inverters eq.,  462 transistors)
+//   - NAND2   :   4 cells (  8.0 inverters eq.,   16 transistors)
+//   - NAND3   :   2 cells (  6.0 inverters eq.,   12 transistors)
 //   - NOR2    :   1 cells (  2.0 inverters eq.,    4 transistors)
-//   - OR2     :   5 cells ( 15.0 inverters eq.,   30 transistors)
-//   - OR3     :   3 cells ( 12.0 inverters eq.,   24 transistors)
-//   - XOR2    :   1 cells (  4.0 inverters eq.,    8 transistors)
+//   - NOR3    :   3 cells (  9.0 inverters eq.,   18 transistors)
+//   - OR2     :   6 cells ( 18.0 inverters eq.,   36 transistors)
+//   - OR3     :   1 cells (  4.0 inverters eq.,    8 transistors)
+//   - XOR2    :   3 cells ( 12.0 inverters eq.,   24 transistors)
 // ============================================================================
 
-module PWM_CTRL_va (clk, rst_n, en_LP_ext, oc_select_ext, oc_ctrl_cp_ext, c_DfT_oc_dig_VDD, cnt, en_LP, en_LowFreq, oc_select, oc_ctrl_bgr, oc_ctrl_cp, is_az_mode, eff_oc_mode);
-  input clk;
-  electrical clk;
-  input rst_n;
-  electrical rst_n;
-  input en_LP_ext;
-  electrical en_LP_ext;
-  input oc_select_ext;
-  electrical oc_select_ext;
-  input oc_ctrl_cp_ext;
-  electrical oc_ctrl_cp_ext;
+module PWM_CTRL_va (VDD, VSS, sub, res_n, c_DFT_en_LP, c_DFT_en_PWM, c_DfT_oc_dig_VDD, en_LP, oc_select, oc_ctrl_cp, oc_ctrl_bgr, clk_i, en_lowFreq, oc_select_ext, oc_ctrl_cp_ext, en_LP_ext, c_metalFix_invert_oc_defaults);
+  input VDD;
+  electrical VDD;
+  input VSS;
+  electrical VSS;
+  input sub;
+  electrical sub;
+  input res_n;
+  electrical res_n;
+  input c_DFT_en_LP;
+  electrical c_DFT_en_LP;
+  input c_DFT_en_PWM;
+  electrical c_DFT_en_PWM;
   input [1:0] c_DfT_oc_dig_VDD;
   electrical [1:0] c_DfT_oc_dig_VDD;
-  output [3:0] cnt;
-  electrical [3:0] cnt;
   output en_LP;
   electrical en_LP;
-  output en_LowFreq;
-  electrical en_LowFreq;
   output oc_select;
   electrical oc_select;
-  output oc_ctrl_bgr;
-  electrical oc_ctrl_bgr;
   output oc_ctrl_cp;
   electrical oc_ctrl_cp;
-  output is_az_mode;
-  electrical is_az_mode;
-  output [1:0] eff_oc_mode;
-  electrical [1:0] eff_oc_mode;
+  output oc_ctrl_bgr;
+  electrical oc_ctrl_bgr;
+  input clk_i;
+  electrical clk_i;
+  output en_lowFreq;
+  electrical en_lowFreq;
+  output oc_select_ext;
+  electrical oc_select_ext;
+  output oc_ctrl_cp_ext;
+  electrical oc_ctrl_cp_ext;
+  output en_LP_ext;
+  electrical en_LP_ext;
+  input c_metalFix_invert_oc_defaults;
+  electrical c_metalFix_invert_oc_defaults;
 
   // Electrical Parameters
   parameter real vhigh = 1.800;
@@ -66,82 +73,92 @@ module PWM_CTRL_va (clk, rst_n, en_LP_ext, oc_select_ext, oc_ctrl_cp_ext, c_DfT_
   // Analog Standard Cell Helper Functions
   analog function real INV;
     input a; real a;
-    INV = !(a > vth) ? 1.0 : 0.0;
+    INV = !(a > 0.900) ? 1.800 : 0.000;
   endfunction
 
   analog function real NAND2;
     input a, b; real a, b;
-    NAND2 = !((a > vth) && (b > vth)) ? 1.0 : 0.0;
+    NAND2 = !((a > 0.900) && (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real AND2;
     input a, b; real a, b;
-    AND2 = ((a > vth) && (b > vth)) ? 1.0 : 0.0;
+    AND2 = ((a > 0.900) && (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real NOR2;
     input a, b; real a, b;
-    NOR2 = !((a > vth) || (b > vth)) ? 1.0 : 0.0;
+    NOR2 = !((a > 0.900) || (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real OR2;
     input a, b; real a, b;
-    OR2 = ((a > vth) || (b > vth)) ? 1.0 : 0.0;
+    OR2 = ((a > 0.900) || (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real XOR2;
     input a, b; real a, b;
-    XOR2 = ((a > vth) != (b > vth)) ? 1.0 : 0.0;
+    XOR2 = ((a > 0.900) != (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real XNOR2;
     input a, b; real a, b;
-    XNOR2 = ((a > vth) == (b > vth)) ? 1.0 : 0.0;
+    XNOR2 = ((a > 0.900) == (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real MUX2;
     input s, d0, d1; real s, d0, d1;
-    MUX2 = (s > vth) ? d1 : d0;
+    MUX2 = (s > 0.900) ? d1 : d0;
   endfunction
 
   analog function real AOI21;
     input a, b, c; real a, b, c;
-    AOI21 = !(((a > vth) && (b > vth)) || (c > vth)) ? 1.0 : 0.0;
+    AOI21 = !(((a > 0.900) && (b > 0.900)) || (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real OAI21;
     input a, b, c; real a, b, c;
-    OAI21 = !(((a > vth) || (b > vth)) && (c > vth)) ? 1.0 : 0.0;
+    OAI21 = !(((a > 0.900) || (b > 0.900)) && (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real NAND3;
     input a, b, c; real a, b, c;
-    NAND3 = !((a > vth) && (b > vth) && (c > vth)) ? 1.0 : 0.0;
+    NAND3 = !((a > 0.900) && (b > 0.900) && (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real AND3;
     input a, b, c; real a, b, c;
-    AND3 = ((a > vth) && (b > vth) && (c > vth)) ? 1.0 : 0.0;
+    AND3 = ((a > 0.900) && (b > 0.900) && (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real NOR3;
     input a, b, c; real a, b, c;
-    NOR3 = !((a > vth) || (b > vth) || (c > vth)) ? 1.0 : 0.0;
+    NOR3 = !((a > 0.900) || (b > 0.900) || (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real OR3;
     input a, b, c; real a, b, c;
-    OR3 = ((a > vth) || (b > vth) || (c > vth)) ? 1.0 : 0.0;
+    OR3 = ((a > 0.900) || (b > 0.900) || (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real NAND4;
     input a, b, c, d; real a, b, c, d;
-    NAND4 = !((a > vth) && (b > vth) && (c > vth) && (d > vth)) ? 1.0 : 0.0;
+    NAND4 = !((a > 0.900) && (b > 0.900) && (c > 0.900) && (d > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real AND4;
     input a, b, c, d; real a, b, c, d;
-    AND4 = ((a > vth) && (b > vth) && (c > vth) && (d > vth)) ? 1.0 : 0.0;
+    AND4 = ((a > 0.900) && (b > 0.900) && (c > 0.900) && (d > 0.900)) ? 1.800 : 0.000;
+  endfunction
+
+  analog function real NOR4;
+    input a, b, c, d; real a, b, c, d;
+    NOR4 = !((a > 0.900) || (b > 0.900) || (c > 0.900) || (d > 0.900)) ? 1.800 : 0.000;
+  endfunction
+
+  analog function real OR4;
+    input a, b, c, d; real a, b, c, d;
+    OR4 = ((a > 0.900) || (b > 0.900) || (c > 0.900) || (d > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   // Internal State & Combinational Signals
@@ -149,63 +166,94 @@ module PWM_CTRL_va (clk, rst_n, en_LP_ext, oc_select_ext, oc_ctrl_cp_ext, c_DfT_
   real cnt_1_q, cnt_1_d;
   real cnt_2_q, cnt_2_d;
   real cnt_3_q, cnt_3_d;
+  real startup_q, startup_d;
+  real chopping_clk_q, chopping_clk_d;
+  real pwm_chop_q, pwm_chop_d;
   real eff_oc_mode_0_val;
   real eff_oc_mode_1_val;
   real is_az_mode_val;
+  real is_static_0_val;
+  real is_static_1_val;
   real is_chop_mode_val;
   real is_pwm_active_window_val;
   real is_pwm_sample_window_val;
-  real en_LP_val;
-  real en_LowFreq_val;
+  real oc_select_ext_val;
+  real oc_ctrl_cp_ext_val;
+  real en_LP_ext_val;
   real oc_select_val;
-  real oc_ctrl_bgr_val;
+  real en_lowFreq_val;
+  real en_LP_val;
   real oc_ctrl_cp_val;
+  real oc_ctrl_bgr_val;
 
   analog begin
-    @(initial_step("static", "ac")) begin
+    @(initial_step) begin
       cnt_0_q = vlow;
       cnt_1_q = vlow;
       cnt_2_q = vlow;
       cnt_3_q = vlow;
+      startup_q = vhigh;
+      chopping_clk_q = vlow;
+      pwm_chop_q = vlow;
+    end
+
+    // Asynchronous Reset Event: res_n falling edge (active low)
+    @(cross(V(res_n) - vth, -1)) begin
+      cnt_0_q = vlow;
+      cnt_1_q = vlow;
+      cnt_2_q = vlow;
+      cnt_3_q = vlow;
+      startup_q = vhigh;
+      chopping_clk_q = vlow;
+      pwm_chop_q = vlow;
     end
 
     // Sequential Register Bank Clock Edge Sampling
-    @(cross(V(clk) - vth, +1)) begin
-      cnt_0_q = (cnt_0_d > vth) ? vhigh : vlow;
-      cnt_1_q = (cnt_1_d > vth) ? vhigh : vlow;
-      cnt_2_q = (cnt_2_d > vth) ? vhigh : vlow;
-      cnt_3_q = (cnt_3_d > vth) ? vhigh : vlow;
+    @(cross(V(clk_i) - vth, +1)) begin
+      if (V(res_n) > vth) begin
+        cnt_0_q = (cnt_0_d > vth) ? vhigh : vlow;
+        cnt_1_q = (cnt_1_d > vth) ? vhigh : vlow;
+        cnt_2_q = (cnt_2_d > vth) ? vhigh : vlow;
+        cnt_3_q = (cnt_3_d > vth) ? vhigh : vlow;
+        startup_q = (startup_d > vth) ? vhigh : vlow;
+        chopping_clk_q = (chopping_clk_d > vth) ? vhigh : vlow;
+        pwm_chop_q = (pwm_chop_d > vth) ? vhigh : vlow;
+      end
     end
 
     // Multi-Level Combinational Logic Evaluations
     cnt_0_d = INV(cnt_0_q);
-    cnt_1_d = XOR2(cnt_1_q, cnt_0_q);
-    cnt_2_d = MUX2(cnt_2_q, AND2(cnt_1_q, cnt_0_q), NAND2(cnt_1_q, cnt_0_q));
-    cnt_3_d = MUX2(cnt_3_q, AND3(cnt_2_q, cnt_1_q, cnt_0_q), NAND3(cnt_2_q, cnt_1_q, cnt_0_q));
-    eff_oc_mode_0_val = V(c_DfT_oc_dig_VDD[0]);
-    eff_oc_mode_1_val = V(c_DfT_oc_dig_VDD[1]);
-    is_az_mode_val = NOR2(eff_oc_mode_1_val, eff_oc_mode_0_val);
-    is_chop_mode_val = AND2(INV(eff_oc_mode_1_val), eff_oc_mode_0_val);
-    is_pwm_active_window_val = OR2(OR2(OR2(AND2(INV(cnt_2_q), cnt_3_q), AND2(cnt_2_q, INV(cnt_3_q))), AND2(cnt_1_q, INV(cnt_3_q))), AND3(INV(cnt_0_q), INV(cnt_1_q), cnt_3_q));
-    is_pwm_sample_window_val = MUX2(cnt_0_q, AND3(cnt_1_q, cnt_2_q, cnt_3_q), MUX2(cnt_1_q, AND2(cnt_2_q, cnt_3_q), AND2(cnt_2_q, cnt_3_q)));
-    en_LP_val = OR3(is_az_mode_val, AND2(is_chop_mode_val, is_pwm_active_window_val), AND2(INV(is_chop_mode_val), V(en_LP_ext)));
-    en_LowFreq_val = MUX2(is_az_mode_val, OR2(is_pwm_sample_window_val, INV(is_chop_mode_val)), 0.0);
-    oc_select_val = OR3(is_az_mode_val, AND2(is_chop_mode_val, is_pwm_active_window_val), AND2(INV(is_chop_mode_val), V(oc_select_ext)));
-    oc_ctrl_bgr_val = MUX2(is_az_mode_val, OR2(is_pwm_sample_window_val, INV(is_chop_mode_val)), 0.0);
-    oc_ctrl_cp_val = OR3(is_az_mode_val, AND2(is_chop_mode_val, is_pwm_active_window_val), AND2(INV(is_chop_mode_val), V(oc_ctrl_cp_ext)));
+    cnt_1_d = XOR2(cnt_0_q, cnt_1_q);
+    cnt_2_d = MUX2(cnt_2_q, AND2(cnt_0_q, cnt_1_q), NAND2(cnt_0_q, cnt_1_q));
+    cnt_3_d = MUX2(cnt_3_q, AND3(cnt_0_q, cnt_1_q, cnt_2_q), NAND3(cnt_0_q, cnt_1_q, cnt_2_q));
+    startup_d = MUX2(startup_q, vlow, MUX2(cnt_0_q, vhigh, NAND3(cnt_1_q, cnt_2_q, cnt_3_q)));
+    chopping_clk_d = INV(chopping_clk_q);
+    pwm_chop_d = MUX2(pwm_chop_q, MUX2(cnt_0_q, NOR3(cnt_1_q, cnt_2_q, cnt_3_q), vlow), MUX2(cnt_0_q, OR3(cnt_1_q, cnt_2_q, cnt_3_q), vhigh));
+    eff_oc_mode_0_val = XOR2(V(c_DfT_oc_dig_VDD[0]), V(c_metalFix_invert_oc_defaults));
+    eff_oc_mode_1_val = XOR2(V(c_DfT_oc_dig_VDD[1]), V(c_metalFix_invert_oc_defaults));
+    is_az_mode_val = NOR2(eff_oc_mode_0_val, eff_oc_mode_1_val);
+    is_static_0_val = AND2(eff_oc_mode_0_val, INV(eff_oc_mode_1_val));
+    is_static_1_val = AND2(INV(eff_oc_mode_0_val), eff_oc_mode_1_val);
+    is_chop_mode_val = AND2(eff_oc_mode_0_val, eff_oc_mode_1_val);
+    is_pwm_active_window_val = NOR3(cnt_1_q, cnt_2_q, cnt_3_q);
+    is_pwm_sample_window_val = MUX2(cnt_0_q, NOR3(cnt_1_q, cnt_2_q, cnt_3_q), AND3(cnt_1_q, cnt_2_q, cnt_3_q));
+    oc_select_val = MUX2(V(c_DFT_en_LP), OR2(is_az_mode_val, is_chop_mode_val), vlow);
+    oc_select_ext_val = oc_select_val;
+    oc_ctrl_cp_val = MUX2(V(c_DFT_en_LP), MUX2(V(c_DFT_en_PWM), MUX2(chopping_clk_q, MUX2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, AND2(is_az_mode_val, startup_q), vlow), vlow), vlow), MUX2(is_az_mode_val, vhigh, MUX2(cnt_1_q, MUX2(cnt_2_q, AND2(INV(cnt_3_q), startup_q), vlow), vlow))), OR2(is_az_mode_val, is_static_1_val)), vhigh), MUX2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, AND2(is_az_mode_val, startup_q), vlow), vlow), vlow), MUX2(is_az_mode_val, vhigh, MUX2(cnt_1_q, MUX2(cnt_2_q, AND2(INV(cnt_3_q), startup_q), vlow), vlow))), OR2(is_az_mode_val, is_static_1_val)), vlow)), MUX2(is_az_mode_val, MUX2(is_static_1_val, AND2(is_chop_mode_val, INV(pwm_chop_q)), NAND2(is_chop_mode_val, pwm_chop_q)), is_pwm_sample_window_val)), vlow);
+    oc_ctrl_cp_ext_val = oc_ctrl_cp_val;
+    en_LP_val = MUX2(V(c_DFT_en_LP), AND2(V(c_DFT_en_PWM), INV(is_pwm_active_window_val)), vhigh);
+    en_LP_ext_val = en_LP_val;
+    en_lowFreq_val = MUX2(V(c_DFT_en_LP), MUX2(V(c_DFT_en_PWM), MUX2(cnt_0_q, MUX2(is_az_mode_val, vlow, MUX2(is_chop_mode_val, MUX2(cnt_1_q, MUX2(cnt_2_q, OR2(INV(startup_q), cnt_3_q), vhigh), vhigh), vlow)), vlow), INV(is_pwm_active_window_val)), vlow);
+    oc_ctrl_bgr_val = MUX2(V(c_DFT_en_LP), MUX2(V(c_DFT_en_PWM), MUX2(chopping_clk_q, MUX2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, AND2(is_az_mode_val, startup_q), vlow), vlow), vlow), MUX2(is_az_mode_val, vhigh, MUX2(cnt_1_q, MUX2(cnt_2_q, AND2(INV(cnt_3_q), startup_q), vlow), vlow))), MUX2(is_static_1_val, MUX2(is_az_mode_val, vlow, MUX2(cnt_1_q, MUX2(cnt_2_q, OR2(INV(startup_q), cnt_3_q), vhigh), vhigh)), MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, NAND2(is_az_mode_val, startup_q), vhigh), vhigh), vhigh))), vlow), MUX2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, AND2(is_az_mode_val, startup_q), vlow), vlow), vlow), MUX2(is_az_mode_val, vhigh, MUX2(cnt_1_q, MUX2(cnt_2_q, AND2(INV(cnt_3_q), startup_q), vlow), vlow))), MUX2(is_static_1_val, MUX2(is_az_mode_val, vlow, MUX2(cnt_1_q, MUX2(cnt_2_q, OR2(INV(startup_q), cnt_3_q), vhigh), vhigh)), MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, NAND2(is_az_mode_val, startup_q), vhigh), vhigh), vhigh))), vhigh)), MUX2(is_az_mode_val, MUX2(is_chop_mode_val, is_static_1_val, pwm_chop_q), is_pwm_sample_window_val)), vlow);
 
     // Analog Electrical Output Drivers
-    V(cnt[3]) <+ transition((cnt_3_q > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(cnt[2]) <+ transition((cnt_2_q > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(cnt[1]) <+ transition((cnt_1_q > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(cnt[0]) <+ transition((cnt_0_q > vth) ? vhigh : vlow, tdel, trise, tfall);
     V(en_LP) <+ transition((en_LP_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(en_LowFreq) <+ transition((en_LowFreq_val > vth) ? vhigh : vlow, tdel, trise, tfall);
     V(oc_select) <+ transition((oc_select_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(oc_ctrl_bgr) <+ transition((oc_ctrl_bgr_val > vth) ? vhigh : vlow, tdel, trise, tfall);
     V(oc_ctrl_cp) <+ transition((oc_ctrl_cp_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(is_az_mode) <+ transition((is_az_mode_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(eff_oc_mode[1]) <+ transition((eff_oc_mode_1_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(eff_oc_mode[0]) <+ transition((eff_oc_mode_0_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(oc_ctrl_bgr) <+ transition((oc_ctrl_bgr_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(en_lowFreq) <+ transition((en_lowFreq_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(oc_select_ext) <+ transition((oc_select_ext_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(oc_ctrl_cp_ext) <+ transition((oc_ctrl_cp_ext_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(en_LP_ext) <+ transition((en_LP_ext_val > vth) ? vhigh : vlow, tdel, trise, tfall);
   end
 endmodule

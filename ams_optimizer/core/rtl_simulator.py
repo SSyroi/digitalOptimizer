@@ -99,8 +99,8 @@ class VerilogExprEvaluator:
             return 0
         try:
             return self._expr(env)
-        except Exception:
-            return 0
+        except Exception as e:
+            raise ValueError(f"Failed to evaluate Verilog expression '{self.expr_str}': {e}") from e
 
     def _expr(self, env: Dict[str, int]) -> int:
         return self._ternary(env)
@@ -194,6 +194,21 @@ class VerilogExprEvaluator:
             return -self._unary(env)
         return self._primary(env)
 
+    def _get_full_var_val(self, txt: str, env: Dict[str, int]) -> int:
+        if txt in env:
+            return env[txt]
+        # Check for bit-level signals txt[0], txt[1], ...
+        val = 0
+        found = False
+        for b in range(32):
+            key = f"{txt}[{b}]"
+            if key in env:
+                found = True
+                val |= (env[key] << b)
+            elif found and b >= 4:
+                break
+        return val if found else 0
+
     def _primary(self, env: Dict[str, int]) -> int:
         k, txt = self.get()
         if k in ("HEX", "BIN", "DEC", "NUM"):
@@ -208,35 +223,60 @@ class VerilogExprEvaluator:
                     l_val = self._expr(env)
                     if self.peek()[0] == "RBRACK":
                         self.get()
-                    full = env.get(txt, 0)
-                    mask = (1 << (b_val - l_val + 1)) - 1
-                    return (full >> l_val) & mask
+                    full = self._get_full_var_val(txt, env)
+                    mask = (1 << (abs(b_val - l_val) + 1)) - 1
+                    shift = min(b_val, l_val)
+                    return (full >> shift) & mask
                 if self.peek()[0] == "RBRACK":
                     self.get()
                 key = f"{txt}[{b_val}]"
                 if key in env:
                     return env[key]
-                full = env.get(txt, 0)
+                full = self._get_full_var_val(txt, env)
                 return (full >> b_val) & 1
-            return env.get(txt, 0)
+            return self._get_full_var_val(txt, env)
         elif k == "LPAREN":
             val = self._expr(env)
             if self.peek()[0] == "RPAREN":
                 self.get()
             return val
         elif k == "LBRACE":
-            # Concatenation {a, b, c}
-            parts = []
-            while self.peek()[0] not in ("RBRACE", "EOF"):
-                parts.append(self._expr(env))
-                if self.peek()[0] == "COMMA":
+            # Check for replication {N{expr}} vs concatenation {a, b, c}
+            first_val = self._expr(env)
+            if self.peek()[0] == "LBRACE":
+                # Replication: {multiplier { expr... }}
+                mult = first_val
+                self.get()  # consume inner LBRACE
+                inner_parts = []
+                while self.peek()[0] not in ("RBRACE", "EOF"):
+                    inner_parts.append(self._expr(env))
+                    if self.peek()[0] == "COMMA":
+                        self.get()
+                if self.peek()[0] == "RBRACE":
+                    self.get()  # consume inner RBRACE
+                if self.peek()[0] == "RBRACE":
+                    self.get()  # consume outer RBRACE
+
+                inner_val = 0
+                for p in inner_parts:
+                    inner_val = (inner_val << 1) | (p & 1)
+                inner_len = max(len(inner_parts), 1)
+                res = 0
+                for _ in range(mult):
+                    res = (res << inner_len) | inner_val
+                return res
+            else:
+                # Concatenation: {first_val, part2, ...}
+                parts = [first_val]
+                while self.peek()[0] == "COMMA":
                     self.get()
-            if self.peek()[0] == "RBRACE":
-                self.get()
-            res = 0
-            for p in parts:
-                res = (res << 1) | (p & 1)
-            return res
+                    parts.append(self._expr(env))
+                if self.peek()[0] == "RBRACE":
+                    self.get()
+                res = 0
+                for p in parts:
+                    res = (res << 1) | (p & 1)
+                return res
         return 0
 
 
@@ -552,6 +592,7 @@ class RTLCombinationalSimulator:
         # 3. Parse continuous assigns
         for m in re.finditer(r"\bassign\s+([A-Za-z_][A-Za-z0-9_]*(?:\[\d+\])?)\s*=\s*([^;]+);", clean):
             self.assigns.append((m.group(1).strip(), m.group(2).strip()))
+        self.parsed_assigns = [(lhs, VerilogExprEvaluator(rhs)) for lhs, rhs in self.assigns]
 
         # 4. Parse sequential always block (isolate active-clock body)
         seq_match = re.search(r"always\s*@\s*\(\s*(?:posedge|negedge)\s+([A-Za-z_][A-Za-z0-9_]*).*?\)\s*begin", clean, re.DOTALL)
@@ -613,9 +654,15 @@ class RTLCombinationalSimulator:
 
     @property
     def primary_inputs(self) -> List[str]:
+        clk_rst_pwr = {"clk", "rst_n", "rst", "reset", "clk_i", "clk_in", "res_n", "vdd", "vss", "sub", "gnd", "vcc"}
+        for r in self.registers.values():
+            if r.clock_signal:
+                clk_rst_pwr.add(r.clock_signal.lower())
+            if r.reset_signal:
+                clk_rst_pwr.add(r.reset_signal.lower())
         inputs = []
         for p in self.ports.values():
-            if p.direction in ("input", "inout") and p.name not in ("clk", "rst_n", "rst", "reset"):
+            if p.direction in ("input", "inout") and p.name.lower() not in clk_rst_pwr:
                 inputs.extend(p.bit_names)
         return inputs
 
@@ -640,6 +687,13 @@ class RTLCombinationalSimulator:
 
     def simulate_vector(self, stimulus: Dict[str, int]) -> Dict[str, int]:
         """Simulates one input stimulus vector with FFs cut, returning all D next-states and Y outputs."""
+        if not hasattr(self, "_cache_keys"):
+            self._cache_keys = tuple(self.primary_inputs + self.register_q_bits)
+
+        cache_key = tuple(stimulus.get(k, 0) for k in self._cache_keys)
+        if hasattr(self, "_last_cache_key") and self._last_cache_key == cache_key:
+            return self._last_results
+
         env = dict(stimulus)
 
         # Populate vector-level integers for registers
@@ -662,21 +716,32 @@ class RTLCombinationalSimulator:
                     val |= (stimulus.get(f"{p_name}[{b}]", 0) << b)
                 env[p_name] = val
 
-        # 1. Combinational always block execution (updates wires / intermediate nets)
+        # 1. Combinational evaluation loop (cross-dependency relaxation between assigns and always @(*))
         comb_env = dict(env)
-        for s in self.comb_always_stmts:
-            s.execute(comb_env, comb_env)
+        for _ in range(3):
+            # A. Evaluate continuous assigns
+            for lhs, evaluator in self.parsed_assigns:
+                val = evaluator.evaluate(comb_env)
+                comb_env[lhs] = val
+                for b in range(16):
+                    key = f"{lhs}[{b}]"
+                    if key in comb_env or any(p.name == lhs and p.width > b for p in self.ports.values()):
+                        comb_env[key] = (val >> b) & 1
 
-        # 2. Continuous assigns execution (driven by X and Q, updates primary outputs / wires)
-        for lhs, rhs in self.assigns:
-            val = VerilogExprEvaluator(rhs).evaluate(comb_env)
+            # B. Evaluate combinational always @(*) blocks
+            for s in self.comb_always_stmts:
+                s.execute(comb_env, comb_env)
+
+        # Final pass for continuous assigns (like output extensions)
+        for lhs, evaluator in self.parsed_assigns:
+            val = evaluator.evaluate(comb_env)
             comb_env[lhs] = val
-            for p_name, port in self.ports.items():
-                if port.name == lhs and port.width > 1:
-                    for b in range(port.width):
-                        comb_env[f"{lhs}[{b}]"] = (val >> b) & 1
+            for b in range(16):
+                key = f"{lhs}[{b}]"
+                if key in comb_env or any(p.name == lhs and p.width > b for p in self.ports.values()):
+                    comb_env[key] = (val >> b) & 1
 
-        # 3. Sequential block execution:
+        # 2. Sequential block execution:
         # Default rule of flip-flops: next-state D holds current state Q unless assigned!
         next_env = dict(env)
         for s in self.sequential_stmts:
@@ -714,6 +779,8 @@ class RTLCombinationalSimulator:
                         vec_val = next_env.get(r_name, 0)
                         results[d_name] = (vec_val >> b) & 1
 
+        self._last_cache_key = cache_key
+        self._last_results = results
         return results
 
     def simulate_all_vectors(self, max_vectors: int = 16384) -> Tuple[List[str], List[Dict[str, int]], Dict[str, List[int]]]:

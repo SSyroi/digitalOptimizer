@@ -138,7 +138,7 @@ class VerilogAEmitter:
         lines.append("  analog begin")
 
         # Initial step reset initialization
-        lines.append('    @(initial_step("static", "ac")) begin')
+        lines.append('    @(initial_step) begin')
         for r_name, r in self.dag.registers.items():
             for bit_i in range(r.width):
                 b_var = f"{r_name}_{bit_i}" if r.width > 1 else r_name
@@ -147,18 +147,47 @@ class VerilogAEmitter:
         lines.append("    end")
         lines.append("")
 
-        # Sequential Clock Sampling
+        # Identify clock and reset signals
         clk_sig = "clk"
+        rst_sig = None
+        rst_active_low = True
         for r in self.dag.registers.values():
             clk_sig = r.clock_signal
+            if r.reset_signal:
+                rst_sig = r.reset_signal
+                rst_active_low = r.is_active_low_reset
             break
 
+        # Asynchronous Reset Event
+        if rst_sig:
+            rst_dir = -1 if rst_active_low else +1
+            rst_cond_desc = "falling edge (active low)" if rst_active_low else "rising edge (active high)"
+            lines.append(f"    // Asynchronous Reset Event: {rst_sig} {rst_cond_desc}")
+            lines.append(f"    @(cross(V({rst_sig}) - vth, {rst_dir})) begin")
+            for r_name, r in self.dag.registers.items():
+                for bit_i in range(r.width):
+                    b_var = f"{r_name}_{bit_i}" if r.width > 1 else r_name
+                    init_val = "vhigh" if ((r.reset_val >> bit_i) & 1) else "vlow"
+                    lines.append(f"      {b_var}_q = {init_val};")
+            lines.append("    end")
+            lines.append("")
+
+        # Sequential Clock Sampling
         lines.append(f"    // Sequential Register Bank Clock Edge Sampling")
         lines.append(f"    @(cross(V({clk_sig}) - vth, +1)) begin")
-        for r_name, r in self.dag.registers.items():
-            for bit_i in range(r.width):
-                b_var = f"{r_name}_{bit_i}" if r.width > 1 else r_name
-                lines.append(f"      {b_var}_q = ({b_var}_d > vth) ? vhigh : vlow;")
+        if rst_sig:
+            rst_inactive = f"V({rst_sig}) > vth" if rst_active_low else f"V({rst_sig}) < vth"
+            lines.append(f"      if ({rst_inactive}) begin")
+            for r_name, r in self.dag.registers.items():
+                for bit_i in range(r.width):
+                    b_var = f"{r_name}_{bit_i}" if r.width > 1 else r_name
+                    lines.append(f"        {b_var}_q = ({b_var}_d > vth) ? vhigh : vlow;")
+            lines.append("      end")
+        else:
+            for r_name, r in self.dag.registers.items():
+                for bit_i in range(r.width):
+                    b_var = f"{r_name}_{bit_i}" if r.width > 1 else r_name
+                    lines.append(f"      {b_var}_q = ({b_var}_d > vth) ? vhigh : vlow;")
         lines.append("    end")
         lines.append("")
 
@@ -239,90 +268,108 @@ class VerilogAEmitter:
                 n_var = n_name.replace("[", "_").replace("]", "") + "_val"
                 expr = self._sub_signal(expr, n_name, n_var)
 
+        # 4. Map literal logic levels 1.0 and 0.0 to vhigh / vlow
+        expr = re.sub(r"\b1\.0\b", "vhigh", expr)
+        expr = re.sub(r"\b0\.0\b", "vlow", expr)
+
         return expr
 
     def _emit_analog_functions(self) -> List[str]:
         """Emits embedded analog gate functions."""
+        v_th = f"{self.threshold_voltage:.3f}"
+        v_hi = f"{self.supply_voltage:.3f}"
+        v_lo = "0.000"
+
         return [
             "  // Analog Standard Cell Helper Functions",
             "  analog function real INV;",
             "    input a; real a;",
-            "    INV = !(a > vth) ? 1.0 : 0.0;",
+            f"    INV = !(a > {v_th}) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real NAND2;",
             "    input a, b; real a, b;",
-            "    NAND2 = !((a > vth) && (b > vth)) ? 1.0 : 0.0;",
+            f"    NAND2 = !((a > {v_th}) && (b > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real AND2;",
             "    input a, b; real a, b;",
-            "    AND2 = ((a > vth) && (b > vth)) ? 1.0 : 0.0;",
+            f"    AND2 = ((a > {v_th}) && (b > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real NOR2;",
             "    input a, b; real a, b;",
-            "    NOR2 = !((a > vth) || (b > vth)) ? 1.0 : 0.0;",
+            f"    NOR2 = !((a > {v_th}) || (b > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real OR2;",
             "    input a, b; real a, b;",
-            "    OR2 = ((a > vth) || (b > vth)) ? 1.0 : 0.0;",
+            f"    OR2 = ((a > {v_th}) || (b > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real XOR2;",
             "    input a, b; real a, b;",
-            "    XOR2 = ((a > vth) != (b > vth)) ? 1.0 : 0.0;",
+            f"    XOR2 = ((a > {v_th}) != (b > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real XNOR2;",
             "    input a, b; real a, b;",
-            "    XNOR2 = ((a > vth) == (b > vth)) ? 1.0 : 0.0;",
+            f"    XNOR2 = ((a > {v_th}) == (b > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real MUX2;",
             "    input s, d0, d1; real s, d0, d1;",
-            "    MUX2 = (s > vth) ? d1 : d0;",
+            f"    MUX2 = (s > {v_th}) ? d1 : d0;",
             "  endfunction",
             "",
             "  analog function real AOI21;",
             "    input a, b, c; real a, b, c;",
-            "    AOI21 = !(((a > vth) && (b > vth)) || (c > vth)) ? 1.0 : 0.0;",
+            f"    AOI21 = !(((a > {v_th}) && (b > {v_th})) || (c > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real OAI21;",
             "    input a, b, c; real a, b, c;",
-            "    OAI21 = !(((a > vth) || (b > vth)) && (c > vth)) ? 1.0 : 0.0;",
+            f"    OAI21 = !(((a > {v_th}) || (b > {v_th})) && (c > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real NAND3;",
             "    input a, b, c; real a, b, c;",
-            "    NAND3 = !((a > vth) && (b > vth) && (c > vth)) ? 1.0 : 0.0;",
+            f"    NAND3 = !((a > {v_th}) && (b > {v_th}) && (c > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real AND3;",
             "    input a, b, c; real a, b, c;",
-            "    AND3 = ((a > vth) && (b > vth) && (c > vth)) ? 1.0 : 0.0;",
+            f"    AND3 = ((a > {v_th}) && (b > {v_th}) && (c > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real NOR3;",
             "    input a, b, c; real a, b, c;",
-            "    NOR3 = !((a > vth) || (b > vth) || (c > vth)) ? 1.0 : 0.0;",
+            f"    NOR3 = !((a > {v_th}) || (b > {v_th}) || (c > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real OR3;",
             "    input a, b, c; real a, b, c;",
-            "    OR3 = ((a > vth) || (b > vth) || (c > vth)) ? 1.0 : 0.0;",
+            f"    OR3 = ((a > {v_th}) || (b > {v_th}) || (c > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real NAND4;",
             "    input a, b, c, d; real a, b, c, d;",
-            "    NAND4 = !((a > vth) && (b > vth) && (c > vth) && (d > vth)) ? 1.0 : 0.0;",
+            f"    NAND4 = !((a > {v_th}) && (b > {v_th}) && (c > {v_th}) && (d > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             "",
             "  analog function real AND4;",
             "    input a, b, c, d; real a, b, c, d;",
-            "    AND4 = ((a > vth) && (b > vth) && (c > vth) && (d > vth)) ? 1.0 : 0.0;",
+            f"    AND4 = ((a > {v_th}) && (b > {v_th}) && (c > {v_th}) && (d > {v_th})) ? {v_hi} : {v_lo};",
+            "  endfunction",
+            "",
+            "  analog function real NOR4;",
+            "    input a, b, c, d; real a, b, c, d;",
+            f"    NOR4 = !((a > {v_th}) || (b > {v_th}) || (c > {v_th}) || (d > {v_th})) ? {v_hi} : {v_lo};",
+            "  endfunction",
+            "",
+            "  analog function real OR4;",
+            "    input a, b, c, d; real a, b, c, d;",
+            f"    OR4 = ((a > {v_th}) || (b > {v_th}) || (c > {v_th}) || (d > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
             ""
         ]

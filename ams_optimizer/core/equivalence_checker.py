@@ -78,12 +78,35 @@ class StandardCellEvaluator:
         return 0
 
     @classmethod
+    def compile_expr(cls, expr: str) -> Callable[[Dict[str, int]], int]:
+        """Precompiles a nested CMOS gate expression into an executable Python callable."""
+        expr = expr.strip()
+        if expr in ("0.0", "0", "1'b0", "1'd0", "vlow"):
+            return lambda env: 0
+        if expr in ("1.0", "1", "1'b1", "1'd1", "vhigh"):
+            return lambda env: 1
+        if expr.startswith("V(") and expr.endswith(")"):
+            inner = expr[2:-1]
+            return lambda env: env.get(expr, env.get(inner, 0))
+
+        gate_match = re.match(r"^([A-Z0-9]+)\((.*)\)$", expr)
+        if not gate_match:
+            # Leaf identifier / net
+            return lambda env: env.get(expr, 0)
+
+        cell = gate_match.group(1)
+        raw_args_str = gate_match.group(2)
+        args_str_list = cls._split_top_level_args(raw_args_str)
+        compiled_args = [cls.compile_expr(a) for a in args_str_list]
+        return lambda env: cls.eval_gate(cell, [a(env) for a in compiled_args])
+
+    @classmethod
     def eval_expr(cls, expr: str, env: Dict[str, int]) -> int:
         """Recursively evaluates a nested CMOS gate expression e.g. OR2(AND2(a, b), c)."""
         expr = expr.strip()
-        if expr in ("0.0", "0", "1'b0", "1'd0"):
+        if expr in ("0.0", "0", "1'b0", "1'd0", "vlow"):
             return 0
-        if expr in ("1.0", "1", "1'b1", "1'd1"):
+        if expr in ("1.0", "1", "1'b1", "1'd1", "vhigh"):
             return 1
         if expr.startswith("V(") and expr.endswith(")"):
             return env.get(expr, env.get(expr[2:-1], 0))
@@ -134,10 +157,23 @@ class FormalEquivalenceChecker:
         start_time = time.time()
 
         # 1. Discover all stimulus input variables: Primary Inputs + Current Register Q States
+        all_node_deps: Set[str] = set()
+        for node in self.dag.nodes.values():
+            all_node_deps.update(node.inputs)
+
+        clk_rst_pwr = {"clk", "rst_n", "rst", "reset", "clk_i", "clk_in", "res_n", "vdd", "vss", "sub", "gnd", "vcc"}
+        for r in self.dag.registers.values():
+            if r.clock_signal:
+                clk_rst_pwr.add(r.clock_signal)
+            if r.reset_signal:
+                clk_rst_pwr.add(r.reset_signal)
+
         stimulus_vars: List[str] = []
         for p in self.dag.primary_inputs:
-            if p not in ("clk", "rst_n", "rst", "reset") and p not in stimulus_vars:
-                stimulus_vars.append(p)
+            base_p = p.split("[")[0]
+            if p not in clk_rst_pwr and base_p not in clk_rst_pwr and (p in all_node_deps or base_p in all_node_deps):
+                if p not in stimulus_vars:
+                    stimulus_vars.append(p)
 
         for r_name, r in self.dag.registers.items():
             for b in r.bit_names:
@@ -158,6 +194,11 @@ class FormalEquivalenceChecker:
 
         # Unreachable states to allow valid Don't-Care simplifications
         unreachable_states = self.reachability.get_unreachable_states()
+
+        # Precompile mapped nodes for ultra-fast vector evaluation
+        compiled_mapped: Dict[str, Callable[[Dict[str, int]], int]] = {}
+        for node_name, mapped in self.mapped_nodes.items():
+            compiled_mapped[node_name] = StandardCellEvaluator.compile_expr(mapped.expression)
 
         mismatches: List[Dict[str, Any]] = []
         matching_count = 0
@@ -188,15 +229,15 @@ class FormalEquivalenceChecker:
                 if node:
                     try:
                         env_golden[node_name] = 1 if node.eval_fn(env_golden) else 0
-                    except Exception:
-                        env_golden[node_name] = 0
+                    except Exception as e:
+                        raise RuntimeError(f"DAG node '{node_name}' golden eval_fn failed: {e}") from e
 
             # 4. Simulate Optimized Standard-Cell Network (Topological gate evaluation)
             env_mapped = dict(stimulus)
             for node_name in self.dag.topo_order:
-                mapped = self.mapped_nodes.get(node_name)
-                if mapped:
-                    env_mapped[node_name] = StandardCellEvaluator.eval_expr(mapped.expression, env_mapped)
+                eval_mapped_fn = compiled_mapped.get(node_name)
+                if eval_mapped_fn:
+                    env_mapped[node_name] = eval_mapped_fn(env_mapped)
                 elif node_name in env_golden:
                     env_mapped[node_name] = env_golden[node_name]
 
