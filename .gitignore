@@ -46,3 +46,5 @@ Thumbs.db
 # Output artifacts from runs (user generated)
 *.va.bak
 *.sp.bak
+parser.out
+parsetab.py
