@@ -402,8 +402,8 @@
       "cell_type": "NAND4",
       "connections": {
         "A": "cnt[0]",
-        "B": "cnt[2]",
-        "C": "cnt[1]",
+        "B": "cnt[1]",
+        "C": "cnt[2]",
         "D": "cnt[3]",
         "Y": "n_15_nand4"
       },
@@ -758,11 +758,11 @@
       "name": "U_COMB_45_n_45_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_1_inv",
-        "B": "n_5_inv",
+        "A": "cnt[0]",
+        "B": "is_az_mode",
         "Y": "n_45_nand2"
       },
-      "level": 15,
+      "level": 9,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
@@ -770,10 +770,10 @@
       "name": "U_COMB_46_n_46_inv_INV",
       "cell_type": "INV",
       "connections": {
-        "A": "n_45_nand2",
+        "A": "is_az_mode",
         "Y": "n_46_inv"
       },
-      "level": 14,
+      "level": 10,
       "inverter_equivalent_ge": 1.0,
       "transistors": 2
     },
@@ -782,88 +782,88 @@
       "cell_type": "NAND2",
       "connections": {
         "A": "n_46_inv",
-        "B": "n_11_inv",
+        "B": "eff_oc_mode[0]",
         "Y": "n_47_nand2"
+      },
+      "level": 9,
+      "inverter_equivalent_ge": 2.0,
+      "transistors": 4
+    },
+    {
+      "name": "U_COMB_48_n_48_nand2_NAND2",
+      "cell_type": "NAND2",
+      "connections": {
+        "A": "n_1_inv",
+        "B": "n_5_inv",
+        "Y": "n_48_nand2"
+      },
+      "level": 15,
+      "inverter_equivalent_ge": 2.0,
+      "transistors": 4
+    },
+    {
+      "name": "U_COMB_49_n_49_inv_INV",
+      "cell_type": "INV",
+      "connections": {
+        "A": "n_48_nand2",
+        "Y": "n_49_inv"
+      },
+      "level": 14,
+      "inverter_equivalent_ge": 1.0,
+      "transistors": 2
+    },
+    {
+      "name": "U_COMB_50_n_50_nand2_NAND2",
+      "cell_type": "NAND2",
+      "connections": {
+        "A": "n_49_inv",
+        "B": "n_11_inv",
+        "Y": "n_50_nand2"
       },
       "level": 13,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
     {
-      "name": "U_COMB_48_n_48_inv_INV",
+      "name": "U_COMB_51_n_51_inv_INV",
       "cell_type": "INV",
       "connections": {
-        "A": "n_47_nand2",
-        "Y": "n_48_inv"
+        "A": "n_50_nand2",
+        "Y": "n_51_inv"
       },
       "level": 12,
       "inverter_equivalent_ge": 1.0,
       "transistors": 2
     },
     {
-      "name": "U_COMB_49_n_49_nand2_NAND2",
+      "name": "U_COMB_52_n_52_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_48_inv",
+        "A": "n_51_inv",
         "B": "is_az_mode",
-        "Y": "n_49_nand2"
+        "Y": "n_52_nand2"
       },
       "level": 11,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
     {
-      "name": "U_COMB_50_n_50_inv_INV",
+      "name": "U_COMB_53_n_53_inv_INV",
       "cell_type": "INV",
       "connections": {
-        "A": "n_49_nand2",
-        "Y": "n_50_inv"
+        "A": "n_52_nand2",
+        "Y": "n_53_inv"
       },
       "level": 10,
       "inverter_equivalent_ge": 1.0,
       "transistors": 2
-    },
-    {
-      "name": "U_COMB_51_n_51_nand2_NAND2",
-      "cell_type": "NAND2",
-      "connections": {
-        "A": "n_50_inv",
-        "B": "startup",
-        "Y": "n_51_nand2"
-      },
-      "level": 9,
-      "inverter_equivalent_ge": 2.0,
-      "transistors": 4
-    },
-    {
-      "name": "U_COMB_52_n_52_inv_INV",
-      "cell_type": "INV",
-      "connections": {
-        "A": "is_az_mode",
-        "Y": "n_52_inv"
-      },
-      "level": 10,
-      "inverter_equivalent_ge": 1.0,
-      "transistors": 2
-    },
-    {
-      "name": "U_COMB_53_n_53_nand2_NAND2",
-      "cell_type": "NAND2",
-      "connections": {
-        "A": "n_52_inv",
-        "B": "eff_oc_mode[0]",
-        "Y": "n_53_nand2"
-      },
-      "level": 9,
-      "inverter_equivalent_ge": 2.0,
-      "transistors": 4
     },
     {
       "name": "U_COMB_54_n_54_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "cnt[0]",
-        "B": "is_az_mode",
+        "A": "n_53_inv",
+        "B": "startup",
         "Y": "n_54_nand2"
       },
       "level": 9,
@@ -874,8 +874,8 @@
       "name": "U_COMB_55_n_55_nand3_NAND3",
       "cell_type": "NAND3",
       "connections": {
-        "A": "n_51_nand2",
-        "B": "n_53_nand2",
+        "A": "n_45_nand2",
+        "B": "n_47_nand2",
         "C": "n_54_nand2",
         "Y": "n_55_nand3"
       },
@@ -1007,7 +1007,7 @@
       "cell_type": "NAND2",
       "connections": {
         "A": "n_65_inv",
-        "B": "n_52_inv",
+        "B": "n_46_inv",
         "Y": "n_66_nand2"
       },
       "level": 6,
@@ -1110,42 +1110,37 @@
       "transistors": 2
     },
     {
-      "name": "U_COMB_75_n_75_nand4_NAND4",
-      "cell_type": "NAND4",
+      "name": "U_COMB_75_n_75_nand2_NAND2",
+      "cell_type": "NAND2",
       "connections": {
-        "A": "n_1_inv",
-        "B": "n_5_inv",
-        "C": "n_11_inv",
-        "D": "startup",
-        "Y": "n_75_nand4"
+        "A": "n_54_nand2",
+        "B": "n_47_nand2",
+        "Y": "n_75_nand2"
       },
-      "level": 6,
-      "inverter_equivalent_ge": 4.0,
-      "transistors": 8
+      "level": 12,
+      "inverter_equivalent_ge": 2.0,
+      "transistors": 4
     },
     {
-      "name": "U_COMB_76_n_76_nand4_NAND4",
-      "cell_type": "NAND4",
+      "name": "U_COMB_76_n_76_inv_INV",
+      "cell_type": "INV",
       "connections": {
-        "A": "n_36_nand2",
-        "B": "cnt[0]_d",
-        "C": "n_75_nand4",
-        "D": "is_az_mode",
-        "Y": "n_76_nand4"
+        "A": "n_75_nand2",
+        "Y": "n_76_inv"
       },
-      "level": 5,
-      "inverter_equivalent_ge": 4.0,
-      "transistors": 8
+      "level": 11,
+      "inverter_equivalent_ge": 1.0,
+      "transistors": 2
     },
     {
       "name": "U_COMB_77_n_77_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_76_nand4",
-        "B": "n_61_inv",
+        "A": "n_76_inv",
+        "B": "cnt[0]_d",
         "Y": "n_77_nand2"
       },
-      "level": 4,
+      "level": 10,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
@@ -1153,11 +1148,11 @@
       "name": "U_COMB_78_n_78_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_19_nor3",
-        "B": "c_DfT_en_PWM",
+        "A": "n_46_inv",
+        "B": "n_63_inv",
         "Y": "n_78_nand2"
       },
-      "level": 4,
+      "level": 12,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
@@ -1165,23 +1160,23 @@
       "name": "U_COMB_79_n_79_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_77_nand2",
-        "B": "n_78_nand2",
+        "A": "n_78_nand2",
+        "B": "n_54_nand2",
         "Y": "n_79_nand2"
       },
-      "level": 3,
+      "level": 11,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
     {
-      "name": "U_COMB_80_en_lowFreq_NOR2",
-      "cell_type": "NOR2",
+      "name": "U_COMB_80_n_80_nand2_NAND2",
+      "cell_type": "NAND2",
       "connections": {
-        "A": "c_DfT_en_LP",
-        "B": "n_79_nand2",
-        "Y": "en_lowFreq"
+        "A": "n_79_nand2",
+        "B": "cnt[0]",
+        "Y": "n_80_nand2"
       },
-      "level": 2,
+      "level": 10,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
@@ -1189,46 +1184,46 @@
       "name": "U_COMB_81_n_81_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_51_nand2",
-        "B": "n_53_nand2",
+        "A": "n_77_nand2",
+        "B": "n_80_nand2",
         "Y": "n_81_nand2"
       },
-      "level": 12,
+      "level": 9,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
     {
-      "name": "U_COMB_82_n_82_inv_INV",
+      "name": "U_COMB_82_n_82_nor2_NOR2",
+      "cell_type": "NOR2",
+      "connections": {
+        "A": "is_chop_mode",
+        "B": "n_81_nand2",
+        "Y": "n_82_nor2"
+      },
+      "level": 8,
+      "inverter_equivalent_ge": 2.0,
+      "transistors": 4
+    },
+    {
+      "name": "U_COMB_83_n_83_inv_INV",
       "cell_type": "INV",
       "connections": {
-        "A": "n_81_nand2",
-        "Y": "n_82_inv"
+        "A": "n_82_nor2",
+        "Y": "n_83_inv"
       },
-      "level": 11,
+      "level": 7,
       "inverter_equivalent_ge": 1.0,
       "transistors": 2
-    },
-    {
-      "name": "U_COMB_83_n_83_nand2_NAND2",
-      "cell_type": "NAND2",
-      "connections": {
-        "A": "n_82_inv",
-        "B": "cnt[0]_d",
-        "Y": "n_83_nand2"
-      },
-      "level": 10,
-      "inverter_equivalent_ge": 2.0,
-      "transistors": 4
     },
     {
       "name": "U_COMB_84_n_84_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_52_inv",
-        "B": "n_63_inv",
+        "A": "n_83_inv",
+        "B": "chopping_clk_d",
         "Y": "n_84_nand2"
       },
-      "level": 12,
+      "level": 6,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
@@ -1236,32 +1231,31 @@
       "name": "U_COMB_85_n_85_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_84_nand2",
-        "B": "n_51_nand2",
+        "A": "n_75_nand2",
+        "B": "cnt[0]_d",
         "Y": "n_85_nand2"
       },
-      "level": 11,
+      "level": 9,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
     {
-      "name": "U_COMB_86_n_86_nand2_NAND2",
-      "cell_type": "NAND2",
+      "name": "U_COMB_86_n_86_inv_INV",
+      "cell_type": "INV",
       "connections": {
-        "A": "n_85_nand2",
-        "B": "cnt[0]",
-        "Y": "n_86_nand2"
+        "A": "n_79_nand2",
+        "Y": "n_86_inv"
       },
       "level": 10,
-      "inverter_equivalent_ge": 2.0,
-      "transistors": 4
+      "inverter_equivalent_ge": 1.0,
+      "transistors": 2
     },
     {
       "name": "U_COMB_87_n_87_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_83_nand2",
-        "B": "n_86_nand2",
+        "A": "n_86_inv",
+        "B": "cnt[0]",
         "Y": "n_87_nand2"
       },
       "level": 9,
@@ -1269,34 +1263,35 @@
       "transistors": 4
     },
     {
-      "name": "U_COMB_88_n_88_nor2_NOR2",
-      "cell_type": "NOR2",
+      "name": "U_COMB_88_n_88_nand2_NAND2",
+      "cell_type": "NAND2",
       "connections": {
-        "A": "is_chop_mode",
+        "A": "n_85_nand2",
         "B": "n_87_nand2",
-        "Y": "n_88_nor2"
+        "Y": "n_88_nand2"
       },
       "level": 8,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
     {
-      "name": "U_COMB_89_n_89_inv_INV",
-      "cell_type": "INV",
+      "name": "U_COMB_89_n_89_nor2_NOR2",
+      "cell_type": "NOR2",
       "connections": {
-        "A": "n_88_nor2",
-        "Y": "n_89_inv"
+        "A": "is_chop_mode",
+        "B": "n_88_nand2",
+        "Y": "n_89_nor2"
       },
       "level": 7,
-      "inverter_equivalent_ge": 1.0,
-      "transistors": 2
+      "inverter_equivalent_ge": 2.0,
+      "transistors": 4
     },
     {
       "name": "U_COMB_90_n_90_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_89_inv",
-        "B": "chopping_clk_d",
+        "A": "n_89_nor2",
+        "B": "chopping_clk",
         "Y": "n_90_nand2"
       },
       "level": 6,
@@ -1307,58 +1302,60 @@
       "name": "U_COMB_91_n_91_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_81_nand2",
-        "B": "cnt[0]_d",
+        "A": "n_84_nand2",
+        "B": "n_90_nand2",
         "Y": "n_91_nand2"
       },
-      "level": 9,
+      "level": 5,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
     {
-      "name": "U_COMB_92_n_92_inv_INV",
+      "name": "U_COMB_92_n_92_nand2_NAND2",
+      "cell_type": "NAND2",
+      "connections": {
+        "A": "n_91_nand2",
+        "B": "n_61_inv",
+        "Y": "n_92_nand2"
+      },
+      "level": 4,
+      "inverter_equivalent_ge": 2.0,
+      "transistors": 4
+    },
+    {
+      "name": "U_COMB_93_n_93_aoi22_AOI22",
+      "cell_type": "AOI22",
+      "connections": {
+        "A": "n_36_nand2",
+        "B": "n_63_inv",
+        "C": "is_chop_mode",
+        "D": "n_22_inv",
+        "Y": "n_93_aoi22"
+      },
+      "level": 8,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
+    },
+    {
+      "name": "U_COMB_94_n_94_inv_INV",
       "cell_type": "INV",
       "connections": {
-        "A": "n_85_nand2",
-        "Y": "n_92_inv"
+        "A": "n_93_aoi22",
+        "Y": "n_94_inv"
       },
-      "level": 10,
+      "level": 7,
       "inverter_equivalent_ge": 1.0,
       "transistors": 2
     },
     {
-      "name": "U_COMB_93_n_93_nand2_NAND2",
+      "name": "U_COMB_95_n_95_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_92_inv",
-        "B": "cnt[0]",
-        "Y": "n_93_nand2"
+        "A": "n_94_inv",
+        "B": "n_46_inv",
+        "Y": "n_95_nand2"
       },
-      "level": 9,
-      "inverter_equivalent_ge": 2.0,
-      "transistors": 4
-    },
-    {
-      "name": "U_COMB_94_n_94_nand2_NAND2",
-      "cell_type": "NAND2",
-      "connections": {
-        "A": "n_91_nand2",
-        "B": "n_93_nand2",
-        "Y": "n_94_nand2"
-      },
-      "level": 8,
-      "inverter_equivalent_ge": 2.0,
-      "transistors": 4
-    },
-    {
-      "name": "U_COMB_95_n_95_nor2_NOR2",
-      "cell_type": "NOR2",
-      "connections": {
-        "A": "is_chop_mode",
-        "B": "n_94_nand2",
-        "Y": "n_95_nor2"
-      },
-      "level": 7,
+      "level": 6,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
@@ -1366,11 +1363,11 @@
       "name": "U_COMB_96_n_96_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_95_nor2",
-        "B": "chopping_clk",
+        "A": "n_95_nand2",
+        "B": "n_68_nand2",
         "Y": "n_96_nand2"
       },
-      "level": 6,
+      "level": 5,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
@@ -1378,11 +1375,11 @@
       "name": "U_COMB_97_n_97_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_90_nand2",
-        "B": "n_96_nand2",
+        "A": "n_96_nand2",
+        "B": "c_DfT_en_PWM",
         "Y": "n_97_nand2"
       },
-      "level": 5,
+      "level": 4,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
@@ -1390,60 +1387,63 @@
       "name": "U_COMB_98_n_98_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_97_nand2",
-        "B": "n_61_inv",
+        "A": "n_92_nand2",
+        "B": "n_97_nand2",
         "Y": "n_98_nand2"
       },
-      "level": 4,
+      "level": 3,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
     {
-      "name": "U_COMB_99_n_99_aoi22_AOI22",
-      "cell_type": "AOI22",
+      "name": "U_COMB_99_oc_ctrl_bgr_NOR2",
+      "cell_type": "NOR2",
       "connections": {
-        "A": "n_36_nand2",
-        "B": "n_63_inv",
-        "C": "is_chop_mode",
-        "D": "n_22_inv",
-        "Y": "n_99_aoi22"
+        "A": "c_DfT_en_LP",
+        "B": "n_98_nand2",
+        "Y": "oc_ctrl_bgr"
       },
-      "level": 8,
+      "level": 2,
+      "inverter_equivalent_ge": 2.0,
+      "transistors": 4
+    },
+    {
+      "name": "U_COMB_100_n_100_nand4_NAND4",
+      "cell_type": "NAND4",
+      "connections": {
+        "A": "n_1_inv",
+        "B": "n_5_inv",
+        "C": "n_11_inv",
+        "D": "startup",
+        "Y": "n_100_nand4"
+      },
+      "level": 6,
       "inverter_equivalent_ge": 4.0,
       "transistors": 8
     },
     {
-      "name": "U_COMB_100_n_100_inv_INV",
-      "cell_type": "INV",
+      "name": "U_COMB_101_n_101_nand4_NAND4",
+      "cell_type": "NAND4",
       "connections": {
-        "A": "n_99_aoi22",
-        "Y": "n_100_inv"
+        "A": "is_az_mode",
+        "B": "n_100_nand4",
+        "C": "cnt[0]_d",
+        "D": "n_36_nand2",
+        "Y": "n_101_nand4"
       },
-      "level": 7,
-      "inverter_equivalent_ge": 1.0,
-      "transistors": 2
-    },
-    {
-      "name": "U_COMB_101_n_101_nand2_NAND2",
-      "cell_type": "NAND2",
-      "connections": {
-        "A": "n_100_inv",
-        "B": "n_52_inv",
-        "Y": "n_101_nand2"
-      },
-      "level": 6,
-      "inverter_equivalent_ge": 2.0,
-      "transistors": 4
+      "level": 5,
+      "inverter_equivalent_ge": 4.0,
+      "transistors": 8
     },
     {
       "name": "U_COMB_102_n_102_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_101_nand2",
-        "B": "n_68_nand2",
+        "A": "n_101_nand4",
+        "B": "n_61_inv",
         "Y": "n_102_nand2"
       },
-      "level": 5,
+      "level": 4,
       "inverter_equivalent_ge": 2.0,
       "transistors": 4
     },
@@ -1451,7 +1451,7 @@
       "name": "U_COMB_103_n_103_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_102_nand2",
+        "A": "n_19_nor3",
         "B": "c_DfT_en_PWM",
         "Y": "n_103_nand2"
       },
@@ -1463,7 +1463,7 @@
       "name": "U_COMB_104_n_104_nand2_NAND2",
       "cell_type": "NAND2",
       "connections": {
-        "A": "n_98_nand2",
+        "A": "n_102_nand2",
         "B": "n_103_nand2",
         "Y": "n_104_nand2"
       },
@@ -1472,12 +1472,12 @@
       "transistors": 4
     },
     {
-      "name": "U_COMB_105_oc_ctrl_bgr_NOR2",
+      "name": "U_COMB_105_en_lowFreq_NOR2",
       "cell_type": "NOR2",
       "connections": {
         "A": "c_DfT_en_LP",
         "B": "n_104_nand2",
-        "Y": "oc_ctrl_bgr"
+        "Y": "en_lowFreq"
       },
       "level": 2,
       "inverter_equivalent_ge": 2.0,

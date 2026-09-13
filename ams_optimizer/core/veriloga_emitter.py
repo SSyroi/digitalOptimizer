@@ -47,7 +47,7 @@ class VerilogAEmitter:
 
     def emit(self) -> str:
         lines: List[str] = []
-        mod_name = f"{self.dag.module_name}_va"
+        mod_name = self.dag.module_name
 
         # 1. Header with Inverter Equivalents & Complexity Notes
         lines.append('`include "constants.vams"')
