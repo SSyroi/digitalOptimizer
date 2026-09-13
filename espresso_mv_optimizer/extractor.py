@@ -248,8 +248,9 @@ class UnifiedRTLExtractor:
             # Optional Don't-Care relaxation for startup states in stateful designs
             # CRITICAL: Never relax next-state D-targets (self.d_targets), so state transitions
             # (such as startup clearing at cnt==15 and steady-state counter/BGR next-states)
-            # are preserved with 100% formal accuracy.
-            if dc_relaxation == "startup_relaxed" and tgt not in self.d_targets and "startup" in self.inputs and any("cnt" in inp for inp in self.inputs):
+            # are preserved with 100% formal accuracy. Also protect en_lowFreq and oc_ctrl_cp
+            # so that the 2-cycle fast clock window and 1-cycle CP-longer-than-BGR timing are preserved.
+            if dc_relaxation == "startup_relaxed" and tgt not in self.d_targets and tgt not in ("en_lowFreq", "oc_ctrl_cp") and "startup" in self.inputs and any("cnt" in inp for inp in self.inputs):
                 startup_idx = self.inputs.index("startup")
                 cnt_indices = [idx for idx, inp in enumerate(self.inputs) if "cnt[" in inp]
                 for row_i in range(num_rows):
