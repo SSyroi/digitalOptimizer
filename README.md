@@ -133,6 +133,18 @@ print(f"Formal LEC Passed: {result.equivalence_result.passed}")
 5. **Direct Output Port Aliasing**:
    Module alias outputs (`oc_select_ext = oc_select`, `oc_ctrl_cp_ext = oc_ctrl_cp`, `en_LP_ext = en_LP`) connect directly to driving nets without requiring 3 extra `BUFFER` gates (saving 6.0 GE).
 
+---
+
+### 5. Mixed-Signal Design Guidelines & Best Practices
+
+- **Glitch-Free Analog Outputs (Output Flip-Flops)**:
+  - For signals directly controlling sensitive analog switches (capacitive DACs, charge pumps, auto-zero sampling), combinational decoders can produce transient switching glitches when multiple counter bits toggle simultaneously.
+  - Adding output registers (`output reg sig` or `assign sig = sig_q;`) completely isolates timing and provides glitch-free analog control at the cost of **1 Flip-Flop per bit** (`17.0 GE` / `34 Transistors`).
+  - The optimizer handles output registers natively: it instantiates the sequential flop in Column 0, connects its `Q` pin directly to the output port, and synthesizes the minimal combinational cone feeding its `D` input.
+- **Timing Window Flexibility (Don't-Care Optimization)**:
+  - When an analog specification permits an edge transition to occur anywhere within an allowable time window $[T_{\min}, T_{\max}]$, avoid hardcoding an arbitrary counter value (e.g. `cnt == 6`).
+  - **Power-of-2 Alignment**: Aligning the transition to a power-of-2 boundary (e.g. `cnt == 8` $\rightarrow$ `cnt[3]`) collapses multi-gate decoders down to 0 or 1 gate, saving 6–10 GE.
+  - **Parameterized Sweep**: Define the threshold as an RTL `parameter` (e.g. `parameter TRANS_VAL = 4;`) and sweep candidate values to select the smallest silicon area.
 
 ---
 
