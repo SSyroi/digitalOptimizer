@@ -33,6 +33,21 @@ class TestEquivalenceChecker(unittest.TestCase):
         self.assertIn("en_LP", eq.verified_signals)
         self.assertIn("oc_select", eq.verified_signals)
 
+    def test_pwm_ctrl_registered_bgr_equivalence(self):
+        with open(os.path.join(EXAMPLES_DIR, "PWM_CTRL_registered_bgr.v"), "r") as f:
+            code = f.read()
+
+        result = self.optimizer.run(code)
+        self.assertIsNotNone(result.equivalence_result)
+        eq = result.equivalence_result
+        self.assertTrue(eq.passed, f"PWM_CTRL_registered_bgr verification failed: {eq.mismatches}")
+        self.assertEqual(len(eq.mismatches), 0)
+        self.assertEqual(eq.total_vectors, 2048)
+        self.assertEqual(eq.matching_vectors, 2048)
+        self.assertIn("oc_ctrl_bgr_d", eq.verified_signals)
+        self.assertIn("oc_ctrl_cp", eq.verified_signals)
+        self.assertIn("en_LP", eq.verified_signals)
+
     def test_gray_counter_equivalence(self):
         with open(os.path.join(EXAMPLES_DIR, "gray_counter.v"), "r") as f:
             code = f.read()

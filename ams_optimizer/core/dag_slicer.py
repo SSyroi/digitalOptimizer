@@ -260,8 +260,31 @@ class VerilogDAGSlicer:
                             deps.add(tok)
             return assigns, deps
 
+        # Wire continuous assign dependencies
+        wire_deps: Dict[str, Set[str]] = {}
+        for match in re.finditer(r"\bassign\s+([A-Za-z_][A-Za-z0-9_]*(?:\[\d+\])?)\s*=\s*([^;]+);", self.clean_code):
+            w_lhs = match.group(1).strip().split("[")[0]
+            w_rhs = match.group(2).strip()
+            wire_deps.setdefault(w_lhs, set()).update(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", w_rhs))
+
+        def expand_tok(tok_name: str, visited: Set[str]) -> Set[str]:
+            if tok_name in visited:
+                return set()
+            visited.add(tok_name)
+            if tok_name in wire_deps:
+                sub_res = set()
+                for sub_t in wire_deps[tok_name]:
+                    sub_res.update(expand_tok(sub_t, visited))
+                return sub_res
+            return {tok_name}
+
         assigns, raw_deps = find_assigned_deps(stmts, r_name)
+        expanded_deps: Set[str] = set()
         for tok in raw_deps:
+            base_tok = tok.split("[")[0]
+            expanded_deps.update(expand_tok(base_tok, set()))
+
+        for tok in expanded_deps:
             base_tok = tok.split("[")[0]
             if base_tok in dag.parameters:
                 continue
