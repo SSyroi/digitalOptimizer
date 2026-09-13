@@ -38,12 +38,22 @@ class AMSOptimizer:
         supply_voltage: float = 1.8,
         threshold_voltage: float = 0.9,
         skill_lib: str = "tsmcN65",
-        run_verification: bool = True
+        run_verification: bool = True,
+        allow_and_or: bool = True,
+        allow_mux: bool = True,
+        qm_max_inputs: int = 6,
+        shannon_min_inputs: int = 3,
+        dual_polarity: bool = True,
     ):
         self.supply_voltage = supply_voltage
         self.threshold_voltage = threshold_voltage
         self.skill_lib = skill_lib
         self.run_verification = run_verification
+        self.allow_and_or = allow_and_or
+        self.allow_mux = allow_mux
+        self.qm_max_inputs = qm_max_inputs
+        self.shannon_min_inputs = shannon_min_inputs
+        self.dual_polarity = dual_polarity
 
     def run(self, verilog_code: str) -> OptimizationResult:
         # Step 1: Multi-Level Slicing (Preserve intermediate conditions)
@@ -58,7 +68,13 @@ class AMSOptimizer:
             local_tables[node_name] = evaluator.evaluate_node(node)
 
         # Step 3: Technology Mapping (NPN Matching + Shannon MUX + Quine-McCluskey)
-        mapper = TechnologyMapper()
+        mapper = TechnologyMapper(
+            allow_and_or=self.allow_and_or,
+            allow_mux=self.allow_mux,
+            qm_max_inputs=self.qm_max_inputs,
+            shannon_min_inputs=self.shannon_min_inputs,
+            dual_polarity=self.dual_polarity,
+        )
         mapped_nodes: Dict[str, MappedLogicNode] = {}
         for node_name in dag.topo_order:
             tt = local_tables.get(node_name)

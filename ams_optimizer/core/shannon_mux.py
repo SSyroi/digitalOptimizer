@@ -16,8 +16,15 @@ from .models import LocalTruthTable, MappedLogicNode
 class ShannonMUXDecomposer:
     """Extracts transmission-gate MUX2 cells via Shannon cofactor expansion."""
 
-    def __init__(self, map_fn: Callable[[LocalTruthTable], MappedLogicNode]):
+    def __init__(
+        self,
+        map_fn: Callable[[LocalTruthTable], MappedLogicNode],
+        allow_and_or: bool = True,
+        allow_mux: bool = True,
+    ):
         self.map_fn = map_fn
+        self.allow_and_or = allow_and_or
+        self.allow_mux = allow_mux
 
     @staticmethod
     def _create_pruned_tt(name: str, rem_inputs: List[str], rem_k: int, minterms: List[int]) -> LocalTruthTable:
@@ -158,41 +165,69 @@ class ShannonMUXDecomposer:
                 # 3. D0 is constant 0.0 -> F = S & D1
                 if res_d0.expression == "0.0":
                     gates = dict(res_d1.gate_counts)
-                    gates["AND2"] = gates.get("AND2", 0) + 1
-                    expr = f"AND2({s}, {res_d1.expression})"
+                    if self.allow_and_or:
+                        gates["AND2"] = gates.get("AND2", 0) + 1
+                        expr = f"AND2({s}, {res_d1.expression})"
+                    else:
+                        gates["NAND2"] = gates.get("NAND2", 0) + 1
+                        gates["INV"] = gates.get("INV", 0) + 1
+                        expr = f"INV(NAND2({s}, {res_d1.expression}))"
                     return MappedLogicNode(node_name=tt.node_name, expression=expr, gate_counts=gates)
 
                 # 4. D1 is constant 0.0 -> F = ~S & D0
                 if res_d1.expression == "0.0":
                     gates = dict(res_d0.gate_counts)
                     gates["INV"] = gates.get("INV", 0) + 1
-                    gates["AND2"] = gates.get("AND2", 0) + 1
-                    expr = f"AND2(INV({s}), {res_d0.expression})"
+                    if self.allow_and_or:
+                        gates["AND2"] = gates.get("AND2", 0) + 1
+                        expr = f"AND2(INV({s}), {res_d0.expression})"
+                    else:
+                        gates["NAND2"] = gates.get("NAND2", 0) + 1
+                        gates["INV"] = gates.get("INV", 0) + 1
+                        expr = f"INV(NAND2(INV({s}), {res_d0.expression}))"
                     return MappedLogicNode(node_name=tt.node_name, expression=expr, gate_counts=gates)
 
                 # 5. D0 is constant 1.0 -> F = ~S | D1
                 if res_d0.expression == "1.0":
                     gates = dict(res_d1.gate_counts)
                     gates["INV"] = gates.get("INV", 0) + 1
-                    gates["OR2"] = gates.get("OR2", 0) + 1
-                    expr = f"OR2(INV({s}), {res_d1.expression})"
+                    if self.allow_and_or:
+                        gates["OR2"] = gates.get("OR2", 0) + 1
+                        expr = f"OR2(INV({s}), {res_d1.expression})"
+                    else:
+                        gates["NOR2"] = gates.get("NOR2", 0) + 1
+                        gates["INV"] = gates.get("INV", 0) + 1
+                        expr = f"INV(NOR2(INV({s}), {res_d1.expression}))"
                     return MappedLogicNode(node_name=tt.node_name, expression=expr, gate_counts=gates)
 
                 # 6. D1 is constant 1.0 -> F = S | D0
                 if res_d1.expression == "1.0":
                     gates = dict(res_d0.gate_counts)
-                    gates["OR2"] = gates.get("OR2", 0) + 1
-                    expr = f"OR2({s}, {res_d0.expression})"
+                    if self.allow_and_or:
+                        gates["OR2"] = gates.get("OR2", 0) + 1
+                        expr = f"OR2({s}, {res_d0.expression})"
+                    else:
+                        gates["NOR2"] = gates.get("NOR2", 0) + 1
+                        gates["INV"] = gates.get("INV", 0) + 1
+                        expr = f"INV(NOR2({s}, {res_d0.expression}))"
                     return MappedLogicNode(node_name=tt.node_name, expression=expr, gate_counts=gates)
 
                 # 7. General MUX2: neither cofactor is constant
-                gates = {"MUX2": 1}
+                gates = {}
                 for g, cnt in res_d0.gate_counts.items():
                     gates[g] = gates.get(g, 0) + cnt
                 for g, cnt in res_d1.gate_counts.items():
                     gates[g] = gates.get(g, 0) + cnt
 
-                expr = f"MUX2({s}, {res_d0.expression}, {res_d1.expression})"
+                if self.allow_mux:
+                    gates["MUX2"] = gates.get("MUX2", 0) + 1
+                    expr = f"MUX2({s}, {res_d0.expression}, {res_d1.expression})"
+                else:
+                    # Fold away MUX2 into 3 NAND2 + 1 INV
+                    gates["NAND2"] = gates.get("NAND2", 0) + 3
+                    gates["INV"] = gates.get("INV", 0) + 1
+                    expr = f"NAND2(NAND2({res_d0.expression}, INV({s})), NAND2({res_d1.expression}, {s}))"
+
                 return MappedLogicNode(node_name=tt.node_name, expression=expr, gate_counts=gates)
 
         return None

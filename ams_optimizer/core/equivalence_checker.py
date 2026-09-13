@@ -200,9 +200,6 @@ class FormalEquivalenceChecker:
         num_vars = len(stimulus_vars)
         total_vectors = 1 << num_vars if num_vars <= 14 else min(max_exhaustive_vectors, 1 << min(num_vars, 14))
 
-        # Unreachable states to allow valid Don't-Care simplifications
-        unreachable_states = self.reachability.get_unreachable_states()
-
         # Precompile mapped nodes for ultra-fast vector evaluation
         compiled_mapped: Dict[str, Callable[[Dict[str, int]], int]] = {}
         for node_name, mapped in self.mapped_nodes.items():
@@ -218,17 +215,7 @@ class FormalEquivalenceChecker:
                 stimulus[stimulus_vars[bit_i]] = (vec_idx >> bit_i) & 1
 
             # Check if this vector represents an unreachable FSM state
-            is_dont_care = False
-            if unreachable_states:
-                for r_name, r in self.dag.registers.items():
-                    if "state" in r_name:
-                        st_val = 0
-                        for bit_i in range(r.width):
-                            b_name = f"{r_name}[{bit_i}]" if r.width > 1 else r_name
-                            st_val |= (stimulus.get(b_name, 0) << bit_i)
-                        if st_val in unreachable_states:
-                            is_dont_care = True
-                            break
+            is_dont_care = self.reachability.is_unreachable_stimulus(stimulus)
 
             # 3. Simulate Golden Network using RTL Simulator (single source of truth)
             if self.rtl_sim:
