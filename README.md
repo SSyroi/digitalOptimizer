@@ -75,7 +75,46 @@ To reproduce each winning architectural trade-off, configure the synthesizer par
 
 ---
 
-### 3. How to Reproduce
+### 3. Automated Parameter Sweep Flow (`--auto-sweep`)
+
+Instead of manually guessing parameter combinations, the optimizer provides an automated **Two-Phase Parameter Sweep** that explores **48 technology mapping configurations** in ~80 seconds (down from 29 minutes):
+
+- **Phase 1: Rapid Multi-Configuration Synthesis (synthesis-only):** Pre-extracts the circuit DAG and truth tables **once** (2.5s for 23 nodes), then sweeps 48 configurations with node-level memoization. Suboptimal candidates are synthesized in ~70s without redundant verification.
+- **Phase 2: Targeted Formal Verification (Winner LEC):** Candidates are Pareto-ranked by Silicon Area (GE) and gate count. Exhaustive **Formal Logic Equivalence Checking (LEC)** is executed across all $2^N$ input combinations **only on the winning candidate(s)** (taking ~6s), mathematically guaranteeing 100% equivalence against golden RTL.
+
+#### Running the Automated Sweep via CLI:
+```bash
+# Run automated 48-configuration sweep, formally verifying the #1 winner:
+python3 -m ams_optimizer.cli examples/PWM_CTRL.v --auto-sweep
+
+# Run automated sweep and formally verify the top 3 Pareto candidates:
+python3 -m ams_optimizer.cli examples/PWM_CTRL.v --auto-sweep --top-n 3
+```
+
+#### Running the Automated Sweep via Python API:
+```python
+from ams_optimizer.core.optimizer import AMSOptimizer
+
+with open("examples/PWM_CTRL.v", "r") as f:
+    verilog_code = f.read()
+
+# Automatically sweep 48 configurations and formally verify the winner in ~85s
+best_result, all_candidates = AMSOptimizer.auto_optimize(
+    verilog_code,
+    verify_top_n=1,
+    verbose=True,
+)
+
+print(f"Winner: {best_result.total_inverter_equivalents:.1f} GE, {best_result.total_gates} cells")
+print(f"Formal LEC: {'100% PASSED' if best_result.equivalence_result.passed else 'FAILED'}")
+print(best_result.bom_report)
+```
+
+---
+
+### 4. Single-Pass Targeted Reproduction
+
+To reproduce specific winning architectural trade-offs directly without running the sweep:
 
 #### Via Command-Line Interface (CLI):
 ```bash
@@ -120,7 +159,7 @@ print(f"Formal LEC Passed: {result.equivalence_result.passed}")
 
 ---
 
-### 4. Key Architectural Innovations Behind the 17.1% Gain
+### 5. Key Architectural Innovations Behind the 17.1% Gain
 
 1. **Global Cross-Cone Common Subexpression Elimination (CSE)**:
    A centralized `subexpr_cache` maps commutative gate structures across distinct cones (`oc_ctrl_cp`, `oc_ctrl_bgr`, `pwm_chop_d`), pruning duplicate inverters and redundant cofactors.
@@ -135,7 +174,7 @@ print(f"Formal LEC Passed: {result.equivalence_result.passed}")
 
 ---
 
-### 5. Mixed-Signal Design Guidelines & Best Practices
+### 6. Mixed-Signal Design Guidelines & Best Practices
 
 - **Glitch-Free Analog Outputs (Output Flip-Flops)**:
   - For signals directly controlling sensitive analog switches (capacitive DACs, charge pumps, auto-zero sampling), combinational decoders can produce transient switching glitches when multiple counter bits toggle simultaneously.
@@ -153,7 +192,10 @@ print(f"Formal LEC Passed: {result.equivalence_result.passed}")
 No installation needed. Run directly with Python 3.9+:
 
 ```bash
-# 1. Synthesize PWM_CTRL to Verilog-A, Structural Netlist JSON, and Virtuoso SKILL
+# 1. Run automated 48-configuration sweep and verify winner:
+python3 ams_optimizer/cli.py examples/PWM_CTRL.v --auto-sweep
+
+# 2. Synthesize PWM_CTRL to Verilog-A, Structural Netlist JSON, and Virtuoso SKILL
 python3 ams_optimizer/cli.py examples/PWM_CTRL.v \
   -o examples/PWM_CTRL_va.va \
   --save-netlist examples/PWM_CTRL_netlist.json \
@@ -162,14 +204,14 @@ python3 ams_optimizer/cli.py examples/PWM_CTRL.v \
   --vdd 1.8 \
   --vth 0.9
 
-# 2. Synthesize SAR ADC Controller
+# 3. Synthesize SAR ADC Controller
 python3 ams_optimizer/cli.py examples/sar_adc_ctrl.v \
   -o examples/sar_adc_ctrl_va.va \
   --save-netlist examples/sar_adc_ctrl_netlist.json
 
-# 3. Or install as a local command (optional)
+# 4. Or install as a local command (optional)
 pip install -e .
-ams-opt examples/gray_counter.v -o examples/gray_counter_va.va
+ams-opt examples/PWM_CTRL.v --auto-sweep
 ```
 
 ---
@@ -195,7 +237,7 @@ pytest tests/
 digitalOptimizer/
 ├── ams_optimizer/             # Unified Multi-Level DAG Optimizer Package
 │   ├── __init__.py
-│   ├── cli.py                 # Pure standard library CLI
+│   ├── cli.py                 # Pure standard library CLI (--auto-sweep, flags)
 │   └── core/
 │       ├── models.py          # Dataclasses, transistor & inverter equivalent costs
 │       ├── dag_slicer.py      # Multi-level RTL slicer & intermediate node extractor
@@ -206,9 +248,12 @@ digitalOptimizer/
 │       ├── quine_mccluskey.py # Pure-Python Quine-McCluskey / Petrick solver
 │       ├── tech_mapper.py     # Technology mapping & global inverter sharing
 │       ├── netlist_generator.py # Intermediate structural gate netlist & JSON serializer
+│       ├── equivalence_checker.py # Formal Logic Equivalence Checking (LEC)
+│       ├── stage_verifier.py  # Mid-synthesis stage-by-stage equivalence verifier
+│       ├── rtl_simulator.py   # Golden Verilog RTL combinational AST simulator
 │       ├── veriloga_emitter.py# Cadence Spectre Verilog-A emitter with GE notes
 │       ├── skill_emitter.py   # Cadence Virtuoso SKILL (.il) schematic generator
-│       └── optimizer.py       # Master synthesis coordinator
+│       └── optimizer.py       # Master synthesis & two-phase auto-sweep coordinator
 ├── examples/                  # Benchmark RTL, Verilog-A models & JSON netlists
 │   ├── PWM_CTRL.v
 │   ├── PWM_CTRL_va.va

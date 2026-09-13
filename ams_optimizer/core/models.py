@@ -142,6 +142,7 @@ class OptimizationResult:
     total_inverter_equivalents: float = 0.0
     total_transistors: int = 0
     equivalence_result: Optional[EquivalenceResult] = None
+    timing_breakdown: Dict[str, float] = field(default_factory=dict)
 
 
 # Physical transistor cost per CMOS standard cell

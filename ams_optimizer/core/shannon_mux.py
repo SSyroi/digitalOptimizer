@@ -67,7 +67,7 @@ class ShannonMUXDecomposer:
                 num_vars=rem_k,
                 true_minterms=minterms,
                 dont_cares=[],
-                bitmask=sum(1 << m for m in minterms)
+                bitmask=sum(1 << m for m in minterms) if rem_k <= 3 else 0
             )
 
         pruned_inputs = [rem_inputs[i] for i in active_bits]
@@ -81,7 +81,7 @@ class ShannonMUXDecomposer:
             pruned_minterms.add(pruned_m)
 
         sorted_pm = sorted(pruned_minterms)
-        bitmask = sum(1 << m for m in sorted_pm)
+        bitmask = sum(1 << m for m in sorted_pm) if pruned_k <= 3 else 0
         return LocalTruthTable(
             node_name=name,
             inputs=pruned_inputs,
@@ -102,25 +102,19 @@ class ShannonMUXDecomposer:
         # Score candidate select lines S to pick the best partition
         candidates = []
         for s_idx, s in enumerate(inputs):
-            rem_inputs = [x for x in inputs if x != s]
+            rem_inputs = inputs[:s_idx] + inputs[s_idx + 1:]
             rem_k = len(rem_inputs)
+            mask_low = (1 << s_idx) - 1
 
             minterms_0: List[int] = []
             minterms_1: List[int] = []
 
-            for row in range(1 << rem_k):
-                # Row with S=0
-                orig_row_0 = 0
-                for idx, rem_name in enumerate(rem_inputs):
-                    bit = (row >> idx) & 1
-                    orig_row_0 |= (bit << inputs.index(rem_name))
-                if orig_row_0 in tt.true_minterms:
-                    minterms_0.append(row)
-
-                # Row with S=1
-                orig_row_1 = orig_row_0 | (1 << s_idx)
-                if orig_row_1 in tt.true_minterms:
-                    minterms_1.append(row)
+            for m in tt.true_minterms:
+                new_m = ((m >> (s_idx + 1)) << s_idx) | (m & mask_low)
+                if (m >> s_idx) & 1:
+                    minterms_1.append(new_m)
+                else:
+                    minterms_0.append(new_m)
 
             c0_len = len(minterms_0)
             c1_len = len(minterms_1)

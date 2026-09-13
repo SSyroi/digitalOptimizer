@@ -19,24 +19,25 @@ def _to_bin_str(val: int, num_vars: int) -> str:
 def _can_combine(t1: str, t2: str) -> Optional[str]:
     diff = 0
     diff_idx = -1
-    for i, (c1, c2) in enumerate(zip(t1, t2)):
+    for i in range(len(t1)):
+        c1 = t1[i]
+        c2 = t2[i]
         if c1 != c2:
             if c1 == "-" or c2 == "-":
                 return None
             diff += 1
-            diff_idx = i
             if diff > 1:
                 return None
+            diff_idx = i
     if diff == 1:
-        res = list(t1)
-        res[diff_idx] = "-"
-        return "".join(res)
+        return t1[:diff_idx] + "-" + t1[diff_idx + 1:]
     return None
 
 
 def _covers(implicant: str, minterm_str: str) -> bool:
-    for ic, mc in zip(implicant, minterm_str):
-        if ic != "-" and ic != mc:
+    for i in range(len(implicant)):
+        ic = implicant[i]
+        if ic != "-" and ic != minterm_str[i]:
             return False
     return True
 
@@ -67,17 +68,22 @@ class QuineMcCluskeySolver:
         while current:
             next_grp: Set[str] = set()
             comb: Set[str] = set()
-            grp_list = list(current)
+            by_ones: Dict[int, List[str]] = {}
+            for t in current:
+                cnt = t.count("1")
+                by_ones.setdefault(cnt, []).append(t)
 
-            for i in range(len(grp_list)):
-                for j in range(i + 1, len(grp_list)):
-                    m = _can_combine(grp_list[i], grp_list[j])
-                    if m is not None:
-                        next_grp.add(m)
-                        comb.add(grp_list[i])
-                        comb.add(grp_list[j])
+            for cnt, grp in by_ones.items():
+                next_ones = by_ones.get(cnt + 1, [])
+                for t1 in grp:
+                    for t2 in next_ones:
+                        m = _can_combine(t1, t2)
+                        if m is not None:
+                            next_grp.add(m)
+                            comb.add(t1)
+                            comb.add(t2)
 
-            for t in grp_list:
+            for t in current:
                 if t not in comb:
                     pis.add(t)
 

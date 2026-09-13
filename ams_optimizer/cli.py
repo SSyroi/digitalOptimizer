@@ -47,6 +47,8 @@ def main():
     parser.add_argument("--shannon-min", type=int, default=3, help="Min inputs for Shannon decomposition (default: 3)")
     parser.add_argument("--allow-buffers", dest="allow_output_buffers", action="store_true", default=True, help="Instantiate BUFFER cells for alias outputs (default: True)")
     parser.add_argument("--no-buffers", dest="allow_output_buffers", action="store_false", help="Omit BUFFER cells for alias outputs via direct wiring")
+    parser.add_argument("--auto-sweep", action="store_true", help="Perform automated fast parameter sweep and formally verify the optimal Pareto candidate")
+    parser.add_argument("--top-n", type=int, default=1, help="Number of top candidates to formally verify during auto-sweep (default: 1)")
 
     args = parser.parse_args()
 
@@ -61,21 +63,42 @@ def main():
     print("AMS Digital Optimizer (Multi-Level DAG Synthesis Engine)")
     print(f"Input RTL: {args.verilog_file}")
     print(f"Voltage: VDD={args.vdd}V, VTH={args.vth}V, Library: {args.lib}")
-    print(f"Options: allow_and_or={args.allow_and_or}, allow_mux={args.allow_mux}, qm_max={args.qm_max}, shannon_min={args.shannon_min}, buffers={args.allow_output_buffers}")
+    if args.auto_sweep:
+        print(f"Mode: Automated Fast Parameter Sweep (Formally verify top {args.top_n} candidate(s))")
+    else:
+        print(f"Options: allow_and_or={args.allow_and_or}, allow_mux={args.allow_mux}, qm_max={args.qm_max}, shannon_min={args.shannon_min}, buffers={args.allow_output_buffers}")
     print("=" * 78)
 
-    optimizer = AMSOptimizer(
-        supply_voltage=args.vdd,
-        threshold_voltage=args.vth,
-        skill_lib=args.lib,
-        run_verification=args.verify,
-        allow_and_or=args.allow_and_or,
-        allow_mux=args.allow_mux,
-        qm_max_inputs=args.qm_max,
-        shannon_min_inputs=args.shannon_min,
-        allow_output_buffers=args.allow_output_buffers,
-    )
-    result = optimizer.run(verilog_code)
+    if args.auto_sweep:
+        result, candidates = AMSOptimizer.auto_optimize(
+            verilog_code,
+            verify_top_n=args.top_n,
+            supply_voltage=args.vdd,
+            threshold_voltage=args.vth,
+            skill_lib=args.lib,
+            verbose=True,
+        )
+        print("\n" + "=" * 80)
+        print(f"{'Rank':<5} | {'GE':<8} | {'Transistors':<12} | {'Cells':<6} | {'MUX':<5} | {'AND/OR':<6} | {'QM':<3} | {'SH':<3} | {'BUF':<5} | {'LEC':<6}")
+        print("=" * 80)
+        for i, c in enumerate(candidates[:10]):
+            p = c["params"]
+            lec_str = "PASS" if c.get("lec_passed") else ("FAIL" if "lec_passed" in c else "—")
+            print(f"{i+1:<5} | {c['ge']:<8.1f} | {c['transistors']:<12} | {c['gates']:<6} | {str(p['allow_mux']):<5} | {str(p['allow_and_or']):<6} | {p['qm_max_inputs']:<3} | {p['shannon_min_inputs']:<3} | {str(p['allow_output_buffers']):<5} | {lec_str:<6}")
+        print("=" * 80)
+    else:
+        optimizer = AMSOptimizer(
+            supply_voltage=args.vdd,
+            threshold_voltage=args.vth,
+            skill_lib=args.lib,
+            run_verification=args.verify,
+            allow_and_or=args.allow_and_or,
+            allow_mux=args.allow_mux,
+            qm_max_inputs=args.qm_max,
+            shannon_min_inputs=args.shannon_min,
+            allow_output_buffers=args.allow_output_buffers,
+        )
+        result = optimizer.run(verilog_code)
 
     print("\n--- Multi-Level Intermediate Conditions & Next-State Gates ---")
     for node_name in result.dag.topo_order:
@@ -127,6 +150,14 @@ def main():
     print(f"  TOTAL GATES           : {result.total_gates} cells")
     print(f"  INVERTER EQUIVALENTS  : {result.total_inverter_equivalents:.1f} inverters (1 GE = 1 Inverter = 2T)")
     print(f"  EST. TRANSISTORS      : ~{result.total_transistors} transistors")
+
+    if result.timing_breakdown:
+        tb = result.timing_breakdown
+        lec_desc = f"{tb.get('verification', 0.0):.4f}s" if result.equivalence_result else "Skipped"
+        print("-" * 35)
+        print(f"  SYNTHESIS TIME        : {tb.get('synthesis_total', 0.0):.4f}s (Slicing: {tb.get('slicing', 0.0):.4f}s, Mapping: {tb.get('mapping', 0.0):.4f}s, Netlist: {tb.get('netlist_gen', 0.0):.4f}s)")
+        print(f"  FORMAL VERIFICATION   : {lec_desc}")
+        print(f"  TOTAL TIME            : {tb.get('total', 0.0):.4f}s")
     print("=" * 78)
 
     if args.output_va:
