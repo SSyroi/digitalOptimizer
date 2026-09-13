@@ -33,7 +33,7 @@ procedure( create_PWM_CTRL_schematic(libName cellName)
     y = 0.0
     ;; Node: oc_ctrl_bgr = oc_ctrl_bgr
     y = y + yStep
-    ;; Node: oc_ctrl_bgr_d = NOR2(c_DfT_en_LP, NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND4(INV(cnt[1]), INV(cnt[2]), INV(cnt[3]), startup), INV(cnt[0])), INV(c_metalFix_invert_oc_defaults)), NAND2(oc_ctrl_bgr, c_metalFix_invert_oc_defaults)), INV(c_DfT_oc_dig_VDD[1])), NAND2(INV(c_metalFix_invert_oc_defaults), c_DfT_oc_dig_VDD[1])), INV(c_DfT_oc_dig_VDD[0])), NAND2(NAND2(NAND2(c_metalFix_invert_oc_defaults, INV(c_DfT_oc_dig_VDD[1])), NAND2(NAND2(NAND2(oc_ctrl_bgr, INV(c_metalFix_invert_oc_defaults)), NAND2(NAND2(NAND4(INV(cnt[1]), INV(cnt[2]), INV(cnt[3]), startup), INV(cnt[0])), c_metalFix_invert_oc_defaults)), c_DfT_oc_dig_VDD[1])), c_DfT_oc_dig_VDD[0])), INV(c_DfT_en_PWM)), NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND3(cnt[1], cnt[2], cnt[3]), INV(c_metalFix_invert_oc_defaults)), NAND2(NAND2(NAND2(NAND4(cnt[0], cnt[2], cnt[3], cnt[1]), INV(oc_ctrl_bgr)), NAND2(INV(NAND4(cnt[0], cnt[1], cnt[2], cnt[3])), oc_ctrl_bgr)), c_metalFix_invert_oc_defaults)), INV(c_DfT_oc_dig_VDD[1])), NAND2(INV(c_metalFix_invert_oc_defaults), c_DfT_oc_dig_VDD[1])), INV(c_DfT_oc_dig_VDD[0])), NAND2(NAND2(NAND2(c_metalFix_invert_oc_defaults, INV(c_DfT_oc_dig_VDD[1])), NAND2(NAND2(NAND2(NAND2(NAND2(NAND4(cnt[0], cnt[2], cnt[3], cnt[1]), INV(oc_ctrl_bgr)), NAND2(INV(NAND4(cnt[0], cnt[1], cnt[2], cnt[3])), oc_ctrl_bgr)), INV(c_metalFix_invert_oc_defaults)), NAND2(NAND3(cnt[1], cnt[2], cnt[3]), c_metalFix_invert_oc_defaults)), c_DfT_oc_dig_VDD[1])), c_DfT_oc_dig_VDD[0])), c_DfT_en_PWM)))
+    ;; Node: oc_ctrl_bgr_d = NOR2(c_DfT_en_LP, NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(INV(cnt[0]), NAND4(INV(cnt[1]), INV(cnt[2]), INV(cnt[3]), startup)), INV(c_metalFix_invert_oc_defaults)), NAND2(oc_ctrl_bgr, c_metalFix_invert_oc_defaults)), INV(c_DfT_oc_dig_VDD[1])), NAND2(INV(c_metalFix_invert_oc_defaults), c_DfT_oc_dig_VDD[1])), INV(c_DfT_oc_dig_VDD[0])), NAND2(NAND2(NAND2(c_metalFix_invert_oc_defaults, INV(c_DfT_oc_dig_VDD[1])), NAND2(NAND2(NAND2(oc_ctrl_bgr, INV(c_metalFix_invert_oc_defaults)), NAND2(NAND2(INV(cnt[0]), NAND4(INV(cnt[1]), INV(cnt[2]), INV(cnt[3]), startup)), c_metalFix_invert_oc_defaults)), c_DfT_oc_dig_VDD[1])), c_DfT_oc_dig_VDD[0])), INV(c_DfT_en_PWM)), NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(NAND3(cnt[1], cnt[2], cnt[3]), INV(c_metalFix_invert_oc_defaults)), NAND2(NAND2(NAND2(NAND2(INV(cnt[0]), NOR3(cnt[1], cnt[2], cnt[3])), INV(oc_ctrl_bgr)), NAND2(NOR2(cnt[0], INV(NOR3(cnt[1], cnt[2], cnt[3]))), oc_ctrl_bgr)), c_metalFix_invert_oc_defaults)), INV(c_DfT_oc_dig_VDD[1])), NAND2(INV(c_metalFix_invert_oc_defaults), c_DfT_oc_dig_VDD[1])), INV(c_DfT_oc_dig_VDD[0])), NAND2(NAND2(NAND2(c_metalFix_invert_oc_defaults, INV(c_DfT_oc_dig_VDD[1])), NAND2(NAND2(NAND2(NAND2(NAND2(NAND2(INV(cnt[0]), NOR3(cnt[1], cnt[2], cnt[3])), INV(oc_ctrl_bgr)), NAND2(NOR2(cnt[0], INV(NOR3(cnt[1], cnt[2], cnt[3]))), oc_ctrl_bgr)), INV(c_metalFix_invert_oc_defaults)), NAND2(NAND3(cnt[1], cnt[2], cnt[3]), c_metalFix_invert_oc_defaults)), c_DfT_oc_dig_VDD[1])), c_DfT_oc_dig_VDD[0])), c_DfT_en_PWM)))
     y = y + yStep
     ;; Node: cnt[0]_d = INV(cnt[0])
     y = y + yStep
@@ -43,7 +43,7 @@ procedure( create_PWM_CTRL_schematic(libName cellName)
     y = y + yStep
     ;; Node: cnt[3]_d = NAND2(NAND2(INV(NAND3(cnt[0], cnt[1], cnt[2])), INV(cnt[3])), NAND2(NAND3(cnt[0], cnt[1], cnt[2]), cnt[3]))
     y = y + yStep
-    ;; Node: startup_d = INV(NAND2(startup, NAND4(cnt[0], cnt[2], cnt[3], cnt[1])))
+    ;; Node: startup_d = INV(NAND2(startup, NAND4(cnt[3], cnt[0], cnt[1], cnt[2])))
     y = y + yStep
     ;; Node: eff_oc_mode[0] = AOI22(c_DfT_oc_dig_VDD[0], c_metalFix_invert_oc_defaults, INV(c_DfT_oc_dig_VDD[0]), INV(c_metalFix_invert_oc_defaults))
     y = y + yStep
@@ -71,7 +71,7 @@ procedure( create_PWM_CTRL_schematic(libName cellName)
     y = y + yStep
     ;; Node: en_LP_ext = en_LP
     y = y + yStep
-    ;; Node: en_lowFreq = NOR2(c_DfT_en_LP, NAND2(NAND2(NAND4(NAND4(INV(cnt[1]), INV(cnt[2]), INV(cnt[3]), startup), is_az_mode, INV(is_chop_mode), INV(cnt[0])), INV(c_DfT_en_PWM)), NAND2(is_pwm_active_window, c_DfT_en_PWM)))
+    ;; Node: en_lowFreq = NOR2(c_DfT_en_LP, NAND2(NAND2(NAND4(is_az_mode, INV(cnt[0]), NAND4(INV(cnt[1]), INV(cnt[2]), INV(cnt[3]), startup), INV(is_chop_mode)), INV(c_DfT_en_PWM)), NAND2(is_pwm_active_window, c_DfT_en_PWM)))
     y = y + yStep
 
     ;; Save and Check
