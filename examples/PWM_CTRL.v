@@ -97,7 +97,7 @@ always @(posedge clk_i or negedge res_n) begin
       oc_ctrl_bgr <= 1'b0;
     end else if (c_DfT_en_PWM && is_az_mode) begin
       // Auto-zero PWM: controls rise at cnt=15, stay high at cnt=0, drop at cnt=1
-      oc_ctrl_bgr <= (cnt == 4'd14) || (cnt == 4'd15);
+      oc_ctrl_bgr <= RELAX_PWM_SAMPLE ? (cnt == 4'd15) : ((cnt == 4'd14) || (cnt == 4'd15));
     end else if (c_DfT_en_PWM && is_chop_mode) begin
       // Swaps chopping polarity once per period, at the middle of the LP=0 gap (cnt: 0 -> 1)
       if (cnt == 4'd0) begin
