@@ -135,13 +135,34 @@ Every synthesis algorithm is isolated in its own dedicated, self-documenting mod
 
 ## 4. Benchmark Results & Comparisons
 
-| Circuit | Description | Regs | Total Gates | Est. Transistors | Key Gates Mapped |
-| :--- | :--- | :---: | :---: | :---: | :--- |
-| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller | 4 | **44 cells** | **~264 T** | `MUX2`, `NOR2`, `AND2`, `OR3`, `DFFR` |
-| **`gray_counter.v`** | 3-bit binary to Gray-code generator | 3 | **5 cells** | **~64 T** | `XOR2`, `DFFR` |
-| **`sar_adc_ctrl.v`** | 4-bit synchronous SAR ADC controller | 8 | **59 cells** | **~394 T** | `MUX2`, `XOR2`, `NOR2`, `AND3`, `DFFR` |
-| **`bandgap_trim_fsm.v`**| Comparator-guided bandgap trimmer | 4 | **33 cells** | **~216 T** | `MUX2`, `NAND2`, `NOR2`, `DFFR` |
-| **`clock_divider_rst.v`**| Configurable 4-bit loadable clock divider | 5 | **85 cells** | **~462 T** | `MUX2`, `NOR3`, `AND4`, `DFFR` |
+### 4.1 Benchmark Circuit Suite
+
+| Circuit | Description | Regs | Total Gates | Inverter Eq. (GE) | Est. Transistors | Key Gates Mapped |
+| :--- | :--- | :---: | :---: | :---: | :---: | :--- |
+| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller (Strict) | 7 | **115 cells** | **325.0 GE** | **~650 T** | `AOI22`, `AOI21`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
+| **`PWM_CTRL_relaxed.v`** | Multi-mode PWM & Auto-Zero (Architectural Relaxations) | 7 | **74 cells** | **273.0 GE** | **~546 T** | `AOI22`, `AOI21`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
+| **`gray_counter.v`** | 3-bit binary to Gray-code generator | 3 | **5 cells** | **32.0 GE** | **~64 T** | `XOR2`, `DFFR` |
+| **`sar_adc_ctrl.v`** | 4-bit synchronous SAR ADC controller | 8 | **59 cells** | **197.0 GE** | **~394 T** | `MUX2`, `XOR2`, `NOR2`, `AND3`, `DFFR` |
+| **`bandgap_trim_fsm.v`**| Comparator-guided bandgap trimmer | 4 | **31 cells** | **104.0 GE** | **~208 T** | `MUX2`, `NOR2`, `DFFR` |
+| **`clock_divider_rst.v`**| Configurable 4-bit loadable clock divider | 5 | **85 cells** | **231.0 GE** | **~462 T** | `MUX2`, `NOR3`, `AND4`, `DFFR` |
+
+### 4.2 Competitive Comparison vs. Automation Deck Baseline (`PWM_CTRL`)
+
+| Synthesis Solution | Total Cells | Area (GE) | Transistors | MUX2 | INV | AOI22 | AOI21 | Area Delta vs. Deck | Cell Delta vs. Deck | Formal LEC (4096 Vecs) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Automation Deck Baseline** | 104 | 392.0 GE | 784 T | 0 | 16 | — | — | Baseline | Baseline | 100% PASS |
+| **AMS Optimizer: Strict RTL (`PWM_CTRL.v`)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
+| **AMS Optimizer: Flexible Nominal (Defaults = 0)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
+| **AMS Optimizer: Flexible Relaxed (`PWM_CTRL_relaxed.v`)** | **74** | **273.0 GE** | **546 T** | **0** | 30 | 6 | 1 | **-119.0 GE (-30.4%)** | **-30 cells (-28.8%)** | **100% PASS** |
+| **AMS Optimizer: Pareto Balanced** | **90** | **328.0 GE** | **656 T** | **15** | 30 | 6 | 1 | **-64.0 GE (-16.3%)** | **-14 cells (-13.5%)** | **100% PASS** |
+| **AMS Optimizer: Minimum Cell Count** | **81** | **339.0 GE** | **678 T** | **12** | 23 | 6 | 1 | **-53.0 GE (-13.5%)** | **-23 cells (-22.1%)** | **100% PASS** |
+
+### 4.3 Verilog Coding Guidelines for AMS Digital Synthesis
+
+1. **Synchronous Reset Flip-Flops**: Use `always @(posedge clk or negedge res_n)` with non-blocking assignments (`<=`). Non-zero resets automatically synthesize to preset flops (`DFFS`).
+2. **Intermediate Net Decomposition**: Define shared terms as `wire` and assign via continuous `assign`. Slices are converted into multi-level DAG nodes that are shared across output cones.
+3. **Architectural Parameters**: Standard Verilog `parameter NAME = VALUE;` is supported. Use parameters with ternary expressions `? :` to define optional timing window relaxations.
+4. **Counter & Decoding Simplification**: Avoid arbitrary comparisons like `cnt == 15 || cnt == 0`. Single-cycle or power-of-2 boundaries (`cnt == 0` or `cnt[3]`) eliminate multi-input comparators and minimize gate counts.
 
 ---
 

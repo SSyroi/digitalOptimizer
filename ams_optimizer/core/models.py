@@ -69,6 +69,7 @@ class SlicedDAG:
     primary_outputs: List[str] = field(default_factory=list)
     register_q_bits: List[str] = field(default_factory=list)
     register_d_bits: List[str] = field(default_factory=list)
+    parameters: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass

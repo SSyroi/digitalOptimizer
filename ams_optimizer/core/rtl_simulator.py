@@ -572,6 +572,12 @@ class RTLCombinationalSimulator:
     def _parse_module(self):
         clean = self.parser.code
 
+        # 0. Parse Parameters
+        self.parameters: Dict[str, int] = {}
+        for m in re.finditer(r"\bparameter\s+(?:\[(\d+):(\d+)\]\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;]+);", clean):
+            p_name = m.group(3)
+            self.parameters[p_name] = parse_verilog_int(m.group(4).strip())
+
         # 1. Parse Ports
         for m in re.finditer(r"\b(input|output|inout)\s+(?:wire\s+|reg\s+)?(?:\[(\d+):(\d+)\]\s+)?([A-Za-z_][A-Za-z0-9_]*)", clean):
             dir_str = m.group(1)
@@ -694,7 +700,8 @@ class RTLCombinationalSimulator:
         if hasattr(self, "_last_cache_key") and self._last_cache_key == cache_key:
             return self._last_results
 
-        env = dict(stimulus)
+        env = dict(self.parameters)
+        env.update(stimulus)
 
         # Populate vector-level integers for registers
         for r_name, reg in self.registers.items():

@@ -20,6 +20,7 @@ from .rtl_simulator import (
     AssignStmt,
     IfStmt,
     CaseStmt,
+    parse_verilog_int,
 )
 
 
@@ -86,6 +87,11 @@ class VerilogDAGSlicer:
                         dag.registers[p_name] = SlicedRegister(name=p_name, width=width, msb=msb, lsb=lsb)
 
     def _parse_declarations(self, dag: SlicedDAG):
+        # Parameters
+        for match in re.finditer(r"\bparameter\s+(?:\[(\d+)\s*:\s*(\d+)\]\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;]+);", self.clean_code):
+            p_name = match.group(3)
+            dag.parameters[p_name] = parse_verilog_int(match.group(4).strip())
+
         # Non-ANSI port declarations
         for match in re.finditer(r"\b(input|output|inout)\s+(?:wire\s+|reg\s+)?(?:\[(\d+)\s*:\s*(\d+)\]\s+)?([^;]+);", self.clean_code):
             p_dir = match.group(1)
@@ -257,6 +263,8 @@ class VerilogDAGSlicer:
         assigns, raw_deps = find_assigned_deps(stmts, r_name)
         for tok in raw_deps:
             base_tok = tok.split("[")[0]
+            if base_tok in dag.parameters:
+                continue
             if base_tok in dag.registers:
                 needed_vars.update(dag.registers[base_tok].bit_names)
             elif base_tok in dag.ports and dag.ports[base_tok].direction == "input":
@@ -354,6 +362,8 @@ class VerilogDAGSlicer:
         tokens = evaluator.tokens
         for i, (tok_type, tok_txt) in enumerate(tokens):
             if tok_type == "ID":
+                if tok_txt in dag.parameters:
+                    continue
                 if i + 3 < len(tokens) and tokens[i+1][1] == "[" and tokens[i+3][1] == "]":
                     bit_str = tokens[i+2][1]
                     in_names.add(f"{tok_txt}[{bit_str}]")
@@ -377,6 +387,11 @@ class VerilogDAGSlicer:
         if not valid_inputs:
             valid_inputs = list(in_names)
 
+        def make_assign_eval(ev: VerilogExprEvaluator, params: Dict[str, int], bit_index: Optional[int] = None):
+            if bit_index is not None:
+                return lambda inp: (ev.evaluate({**params, **inp}) >> bit_index) & 1
+            return lambda inp: 1 if ev.evaluate({**params, **inp}) else 0
+
         port_or_wire = dag.ports.get(lhs) or dag.wires.get(lhs)
         if port_or_wire and port_or_wire.width > 1:
             for bit_i in range(port_or_wire.width):
@@ -385,7 +400,7 @@ class VerilogDAGSlicer:
                     name=b_lhs,
                     node_type="primary_output" if b_lhs in dag.primary_outputs else "intermediate",
                     inputs=sorted(valid_inputs),
-                    eval_fn=lambda inp, idx=bit_i, ev=evaluator: (ev.evaluate(inp) >> idx) & 1,
+                    eval_fn=make_assign_eval(evaluator, dag.parameters, bit_i),
                     level=1,
                     raw_expr=f"({rhs})[{bit_i}]"
                 )
@@ -396,7 +411,7 @@ class VerilogDAGSlicer:
             name=lhs,
             node_type=node_type,
             inputs=sorted(valid_inputs),
-            eval_fn=lambda inp, ev=evaluator: 1 if ev.evaluate(inp) else 0,
+            eval_fn=make_assign_eval(evaluator, dag.parameters),
             level=1,
             raw_expr=rhs
         )
@@ -463,6 +478,8 @@ class VerilogDAGSlicer:
             expanded_deps: Set[str] = set()
             for d in raw_deps:
                 base_d = d.split("[")[0]
+                if base_d in dag.parameters:
+                    continue
                 port_or_wire = dag.ports.get(base_d) or dag.wires.get(base_d)
                 reg = dag.registers.get(base_d)
                 if "[" in d:
@@ -478,12 +495,15 @@ class VerilogDAGSlicer:
             # Safety fallback: if expanded_deps is empty, search tokens in body
             if not expanded_deps:
                 for tok in re.findall(r"[A-Za-z_][A-Za-z0-9_]*(?:\[\d+\])?", body):
+                    if tok in dag.parameters:
+                        continue
                     if (tok in available or tok in dag.nodes) and tok != out:
                         expanded_deps.add(tok)
 
-            def make_comb_eval(tgt: str, statements: List[Stmt]):
+            def make_comb_eval(tgt: str, statements: List[Stmt], params: Dict[str, int]):
                 def _eval(inp: Dict[str, int]) -> int:
-                    env = dict(inp)
+                    env = dict(params)
+                    env.update(inp)
                     for s in statements:
                         s.execute(env, env)
                     return env.get(tgt, 0)
@@ -493,7 +513,7 @@ class VerilogDAGSlicer:
                 name=out,
                 node_type="primary_output" if out in dag.primary_outputs else "intermediate",
                 inputs=sorted(expanded_deps),
-                eval_fn=make_comb_eval(out, stmts),
+                eval_fn=make_comb_eval(out, stmts, dag.parameters),
                 level=2,
                 raw_expr=f"MUX({out})"
             )
