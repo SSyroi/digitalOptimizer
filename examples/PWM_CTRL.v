@@ -77,19 +77,31 @@ assign is_chop_mode = (eff_oc_mode == 2'b11);
 assign is_pwm_active_window = (cnt < 4'd2);
 
 // -----------------------------------------------------------------------------
-// Sequential Core: Counter, Startup Flag, and Registered BGR Control
+// Sequential Core: Counter, Startup Flag, Registered BGR & en_LP Outputs
 // -----------------------------------------------------------------------------
 always @(posedge clk_i or negedge res_n) begin
   if (!res_n) begin
     cnt         <= 4'b0000;
     startup     <= 1'b1;
     oc_ctrl_bgr <= 1'b1; // In nominal auto-zero startup, BGR initializes high
+    en_LP       <= 1'b0; // Active mode on reset
   end else begin
     cnt <= cnt + 4'b0001;
 
     // Startup flag clearing after initial startup phase
     if (cnt == 4'd15) begin
       startup <= 1'b0;
+    end
+
+    // Sequential Low-Power Enable Output (Registered Flip-Flop)
+    // In PWM mode, the active window is en_LP = 0 for 2 cycles (cnt = 0 and cnt = 1).
+    // Sampled at posedge: at cnt=15 (entering cnt=0) and cnt=0 (entering cnt=1), en_LP <= 0.
+    if (c_DfT_en_LP) begin
+      en_LP <= 1'b1;
+    end else if (c_DfT_en_PWM) begin
+      en_LP <= !((cnt == 4'd15) || (cnt == 4'd0));
+    end else begin
+      en_LP <= 1'b0; // Normal active operation
     end
 
     // Sequential BGR Control Output (Registered Flip-Flop)
@@ -125,22 +137,13 @@ end
 // Combinational Control Logic
 // -----------------------------------------------------------------------------
 always @(*) begin
-  // 1. Low-Power Enable Logic (en_LP)
-  if (c_DfT_en_LP) begin
-    en_LP = 1'b1;
-  end else if (c_DfT_en_PWM) begin
-    en_LP = !is_pwm_active_window;
-  end else begin
-    en_LP = 1'b0; // Normal active operation
-  end
-
-  // 2. Frequency Control Logic (en_lowFreq)
+  // 1. Frequency Control Logic (en_lowFreq)
   // Fast clock (0) during auto-zero sampling or chopping.
   // Slow clock (1) during closed-loop operation.
   if (c_DfT_en_LP) begin
     en_lowFreq = 1'b0;
   end else if (c_DfT_en_PWM) begin
-    en_lowFreq = !is_pwm_active_window; // Fast only over the LP=0 gap
+    en_lowFreq = en_LP; // Fast (0) only over the LP=0 gap
   end else if (is_chop_mode) begin
     en_lowFreq = 1'b0;
   end else if (is_az_mode) begin

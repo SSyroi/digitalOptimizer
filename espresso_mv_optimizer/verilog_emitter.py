@@ -107,14 +107,18 @@ class UnifiedVerilogNetlistEmitter:
                     cube_map[c_str] = len(unique_cubes)
                     unique_cubes.append((c_str, c))
 
+        d_targets = [t for t in self.targets if t.endswith("_d")]
+        reg_info = []  # (base_name, ident, rst_val)
+        for t in d_targets:
+            base = t[:-2]
+            ident = base.replace("[", "_").replace("]", "")
+            rst_val = 1.0 if base in ("oc_ctrl_bgr", "startup") else 0.0
+            reg_info.append((base, ident, rst_val))
+
         # Wires
         lines.append("  // Internal State Registers & Next-State Nets")
-        lines.append("  wire oc_ctrl_bgr_q, oc_ctrl_bgr_d;")
-        lines.append("  wire cnt_0_q, cnt_0_d;")
-        lines.append("  wire cnt_1_q, cnt_1_d;")
-        lines.append("  wire cnt_2_q, cnt_2_d;")
-        lines.append("  wire cnt_3_q, cnt_3_d;")
-        lines.append("  wire startup_q, startup_d;")
+        for base, ident, rst_val in reg_info:
+            lines.append(f"  wire {ident}_q, {ident}_d;")
         lines.append("")
         lines.append("  // Inverted Polarity Pool Wires")
         lines.append("  wire " + ", ".join(f"w_inv_{var_ident_map[v]}" for v in var_names) + ";")
@@ -185,23 +189,18 @@ class UnifiedVerilogNetlistEmitter:
 
         # Output Stage Gate Instantiations
         lines.append("  // 3. Output Stage Combinational Gates (NAND Combinations of Shared Wires)")
-        target_wire_map = {
-            "en_LP": "en_LP",
-            "oc_select": "oc_select",
-            "oc_ctrl_cp": "oc_ctrl_cp",
-            "en_lowFreq": "en_lowFreq",
-            "oc_ctrl_bgr_d": "oc_ctrl_bgr_d",
-            "cnt[3]_d": "cnt_3_d",
-            "cnt[2]_d": "cnt_2_d",
-            "cnt[1]_d": "cnt_1_d",
-            "cnt[0]_d": "cnt_0_d",
-            "startup_d": "startup_d",
-        }
+        target_wire_map = {}
+        for tgt in self.targets:
+            if tgt.endswith("_d"):
+                ident = tgt[:-2].replace("[", "_").replace("]", "")
+                target_wire_map[tgt] = f"{ident}_d"
+            else:
+                target_wire_map[tgt] = tgt
 
         def emit_nand_or_tree(inputs: List[str], target_net: str, prefix: str) -> List[str]:
             k = len(inputs)
             if k == 1:
-                return [f"  assign {target_net} = {inputs[0]};"]
+                return [f"  INV_X1 U_{prefix} (.A({inputs[0]}), .Y({target_net}));"]
             elif k == 2:
                 return [f"  NAND2_X1 U_{prefix} (.A({inputs[0]}), .B({inputs[1]}), .Y({target_net}));"]
             elif k == 3:
@@ -244,15 +243,16 @@ class UnifiedVerilogNetlistEmitter:
         lines.append("")
         # Flip-Flops
         lines.append("  // 4. Sequential Register Bank")
-        lines.append("  DFFS_X1 U_dff_bgr   (.D(oc_ctrl_bgr_d), .CK(clk_i), .SN(res_n), .Q(oc_ctrl_bgr_q), .QN());")
-        lines.append("  DFFR_X1 U_dff_cnt0  (.D(cnt_0_d),       .CK(clk_i), .RN(res_n), .Q(cnt_0_q),       .QN());")
-        lines.append("  DFFR_X1 U_dff_cnt1  (.D(cnt_1_d),       .CK(clk_i), .RN(res_n), .Q(cnt_1_q),       .QN());")
-        lines.append("  DFFR_X1 U_dff_cnt2  (.D(cnt_2_d),       .CK(clk_i), .RN(res_n), .Q(cnt_2_q),       .QN());")
-        lines.append("  DFFR_X1 U_dff_cnt3  (.D(cnt_3_d),       .CK(clk_i), .RN(res_n), .Q(cnt_3_q),       .QN());")
-        lines.append("  DFFS_X1 U_dff_start (.D(startup_d),     .CK(clk_i), .SN(res_n), .Q(startup_q),     .QN());")
+        for base, ident, rst_val in reg_info:
+            cell = "DFFS_X1" if rst_val == 1.0 else "DFFR_X1"
+            pin = "SN(res_n)" if rst_val == 1.0 else "RN(res_n)"
+            lines.append(f"  {cell} U_dff_{ident:<10} (.D({ident}_d), .CK(clk_i), .{pin}, .Q({ident}_q), .QN());")
         lines.append("")
         lines.append("  // Extended Output Aliases")
-        lines.append("  assign oc_ctrl_bgr   = oc_ctrl_bgr_q;")
+        if any(t == "oc_ctrl_bgr_d" for t in self.targets):
+            lines.append("  assign oc_ctrl_bgr   = oc_ctrl_bgr_q;")
+        if any(t == "en_LP_d" for t in self.targets):
+            lines.append("  assign en_LP         = en_LP_q;")
         lines.append("  assign oc_select_ext = oc_select;")
         lines.append("  assign oc_ctrl_cp_ext= oc_ctrl_cp;")
         lines.append("  assign en_LP_ext     = en_LP;")

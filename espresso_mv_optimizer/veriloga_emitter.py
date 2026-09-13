@@ -166,14 +166,18 @@ class UnifiedVerilogAEmitter:
                     cube_map[c_str] = len(unique_cubes)
                     unique_cubes.append((c_str, c))
 
-        # 6. Internal Signal Declarations
+        # 6. Internal State Registers & Target Classification
+        d_targets = [t for t in self.targets if t.endswith("_d")]
+        reg_info = []  # (base_name, ident, rst_val)
+        for t in d_targets:
+            base = t[:-2]
+            ident = base.replace("[", "_").replace("]", "")
+            rst_val = 1.0 if base in ("oc_ctrl_bgr", "startup") else 0.0
+            reg_info.append((base, ident, rst_val))
+
         lines.append("  // Internal State Registers")
-        lines.append("  real oc_ctrl_bgr_q, oc_ctrl_bgr_d;")
-        lines.append("  real cnt_0_q, cnt_0_d;")
-        lines.append("  real cnt_1_q, cnt_1_d;")
-        lines.append("  real cnt_2_q, cnt_2_d;")
-        lines.append("  real cnt_3_q, cnt_3_d;")
-        lines.append("  real startup_q, startup_d;")
+        for base, ident, rst_val in reg_info:
+            lines.append(f"  real {ident}_q, {ident}_d;")
         lines.append("")
         lines.append("  // Primary Input Logic Variables")
         lines.append("  real c_DfT_en_LP_in;")
@@ -188,40 +192,31 @@ class UnifiedVerilogAEmitter:
         lines.append(f"  // Shared Intermediate Product Term Nodes ({len(unique_cubes)} unique shared cubes)")
         lines.append("  real " + ", ".join(f"w_c{i}" for i in range(len(unique_cubes))) + ";")
         lines.append("")
-        lines.append("  // Combinational Target Evaluation Wires")
-        lines.append("  real en_LP_val, en_lowFreq_val, oc_select_val, oc_ctrl_cp_val;")
-        lines.append("")
+
+        comb_targets = [t for t in self.targets if not t.endswith("_d")]
+        if comb_targets:
+            lines.append("  // Combinational Target Evaluation Wires")
+            lines.append("  real " + ", ".join(f"{t}_val" for t in comb_targets) + ";")
+            lines.append("")
 
         # 7. Analog Behavior Block
         lines.append("  analog begin")
         lines.append("    @(initial_step) begin")
-        lines.append("      oc_ctrl_bgr_q = 1.0;")
-        lines.append("      cnt_0_q = 0.0;")
-        lines.append("      cnt_1_q = 0.0;")
-        lines.append("      cnt_2_q = 0.0;")
-        lines.append("      cnt_3_q = 0.0;")
-        lines.append("      startup_q = 1.0;")
+        for base, ident, rst_val in reg_info:
+            lines.append(f"      {ident}_q = {rst_val:.1f};")
         lines.append("    end")
         lines.append("")
         lines.append("    // Asynchronous Reset: res_n falling edge")
         lines.append("    @(cross(V(res_n) - vth, -1)) begin")
-        lines.append("      oc_ctrl_bgr_q = 1.0;")
-        lines.append("      cnt_0_q = 0.0;")
-        lines.append("      cnt_1_q = 0.0;")
-        lines.append("      cnt_2_q = 0.0;")
-        lines.append("      cnt_3_q = 0.0;")
-        lines.append("      startup_q = 1.0;")
+        for base, ident, rst_val in reg_info:
+            lines.append(f"      {ident}_q = {rst_val:.1f};")
         lines.append("    end")
         lines.append("")
         lines.append("    // Clock Edge Register Capture")
         lines.append("    @(cross(V(clk_i) - vth, +1)) begin")
         lines.append("      if (V(res_n) > vth) begin")
-        lines.append("        oc_ctrl_bgr_q = (oc_ctrl_bgr_d > 0.5) ? 1.0 : 0.0;")
-        lines.append("        cnt_0_q       = (cnt_0_d > 0.5) ? 1.0 : 0.0;")
-        lines.append("        cnt_1_q       = (cnt_1_d > 0.5) ? 1.0 : 0.0;")
-        lines.append("        cnt_2_q       = (cnt_2_d > 0.5) ? 1.0 : 0.0;")
-        lines.append("        cnt_3_q       = (cnt_3_d > 0.5) ? 1.0 : 0.0;")
-        lines.append("        startup_q     = (startup_d > 0.5) ? 1.0 : 0.0;")
+        for base, ident, rst_val in reg_info:
+            lines.append(f"        {ident}_q = ({ident}_d > 0.5) ? 1.0 : 0.0;")
         lines.append("      end")
         lines.append("    end")
         lines.append("")
@@ -277,18 +272,13 @@ class UnifiedVerilogAEmitter:
         lines.append("    // 3. Output Stage Combinational Logic (DeMorgan NAND Trees of Shared Nodes)")
         lines.append("    // -------------------------------------------------------------------------")
 
-        target_va_map = {
-            "en_LP": "en_LP_val",
-            "oc_select": "oc_select_val",
-            "oc_ctrl_cp": "oc_ctrl_cp_val",
-            "en_lowFreq": "en_lowFreq_val",
-            "oc_ctrl_bgr_d": "oc_ctrl_bgr_d",
-            "cnt[3]_d": "cnt_3_d",
-            "cnt[2]_d": "cnt_2_d",
-            "cnt[1]_d": "cnt_1_d",
-            "cnt[0]_d": "cnt_0_d",
-            "startup_d": "startup_d",
-        }
+        target_va_map = {}
+        for tgt in self.targets:
+            if tgt.endswith("_d"):
+                ident = tgt[:-2].replace("[", "_").replace("]", "")
+                target_va_map[tgt] = f"{ident}_d"
+            else:
+                target_va_map[tgt] = f"{tgt}_val"
 
         for tgt in self.targets:
             va_var = target_va_map.get(tgt, f"{tgt}_val")
@@ -309,15 +299,27 @@ class UnifiedVerilogAEmitter:
                 lines.append(f"    {va_var:<15} = INV(w_c{c_idx});")
 
         lines.append("")
+
+        def get_driver(sig_name: str) -> str:
+            if any(t == f"{sig_name}_d" or (t.startswith(f"{sig_name}[") and t.endswith("_d")) for t in self.targets):
+                return f"{sig_name}_q"
+            return f"{sig_name}_val"
+
+        en_lp_drv = get_driver("en_LP")
+        oc_sel_drv = get_driver("oc_select")
+        oc_cp_drv = get_driver("oc_ctrl_cp")
+        oc_bgr_drv = get_driver("oc_ctrl_bgr")
+        en_lf_drv = get_driver("en_lowFreq")
+
         lines.append("    // Analog Electrical Output Drivers")
-        lines.append("    V(en_LP)           <+ transition((en_LP_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
-        lines.append("    V(oc_select)       <+ transition((oc_select_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
-        lines.append("    V(oc_ctrl_cp)      <+ transition((oc_ctrl_cp_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
-        lines.append("    V(oc_ctrl_bgr)     <+ transition((oc_ctrl_bgr_q > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
-        lines.append("    V(en_lowFreq)      <+ transition((en_lowFreq_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
-        lines.append("    V(oc_select_ext)   <+ transition((oc_select_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
-        lines.append("    V(oc_ctrl_cp_ext)  <+ transition((oc_ctrl_cp_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
-        lines.append("    V(en_LP_ext)       <+ transition((en_LP_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
+        lines.append(f"    V(en_LP)           <+ transition(({en_lp_drv} > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
+        lines.append(f"    V(oc_select)       <+ transition(({oc_sel_drv} > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
+        lines.append(f"    V(oc_ctrl_cp)      <+ transition(({oc_cp_drv} > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
+        lines.append(f"    V(oc_ctrl_bgr)     <+ transition(({oc_bgr_drv} > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
+        lines.append(f"    V(en_lowFreq)      <+ transition(({en_lf_drv} > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
+        lines.append(f"    V(oc_select_ext)   <+ transition(({oc_sel_drv} > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
+        lines.append(f"    V(oc_ctrl_cp_ext)  <+ transition(({oc_cp_drv} > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
+        lines.append(f"    V(en_LP_ext)       <+ transition(({en_lp_drv} > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);")
         lines.append("  end")
         lines.append("endmodule")
         lines.append("")
