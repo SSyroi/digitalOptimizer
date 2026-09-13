@@ -90,7 +90,7 @@ class UnifiedRTLExtractor:
         find_seq(ast)
 
         # Determine widths of registers
-        reg_widths: Dict[str, int] = {}
+        reg_widths: Dict[str, int] = {name: width for name, _, width, _, _ in self.ports}
         for item in module.items:
             if isinstance(item, Decl):
                 for d in item.list:

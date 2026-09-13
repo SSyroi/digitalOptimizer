@@ -11,6 +11,7 @@ from typing import Dict, Any, List
 from .extractor import UnifiedRTLExtractor
 from .multi_output_engine import MultiOutputEspressoEngine
 from .gate_mapper import SharedGateMapper
+from .state_verifier import StateSpaceVerifier
 
 
 class UnifiedEspressoMVOptimizer:
@@ -63,6 +64,10 @@ class UnifiedEspressoMVOptimizer:
         # 4. Formal Verification against Golden Truth Table
         lec_passed = self._verify_equivalence(extractor, min_exprs, engine.py_vars, table_strings)
 
+        # 5. Formal FSM State-Space & Deadlock Verification Audit
+        state_verifier = StateSpaceVerifier(extractor)
+        state_audit = state_verifier.verify(table_strings)
+
         metrics.update({
             "name": f"Espresso-MV (dc={dc_relaxation}, sh={shannon_threshold}, fan={max_fan_in})",
             "dc_relaxation": dc_relaxation,
@@ -75,6 +80,7 @@ class UnifiedEspressoMVOptimizer:
             "min_exprs": min_exprs,
             "shared_cubes": shared_cubes,
             "lec_passed": lec_passed,
+            "state_audit": state_audit,
             "time_extract_s": t_extract,
             "time_espresso_s": t_esp,
             "input_names": extractor.inputs,

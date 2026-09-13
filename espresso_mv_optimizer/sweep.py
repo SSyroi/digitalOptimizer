@@ -23,6 +23,7 @@ from typing import List, Dict, Any
 from espresso_mv_optimizer.extractor import UnifiedRTLExtractor
 from espresso_mv_optimizer.multi_output_engine import MultiOutputEspressoEngine
 from espresso_mv_optimizer.gate_mapper import SharedGateMapper
+from espresso_mv_optimizer.state_verifier import StateSpaceVerifier
 
 
 def verify_equivalence_fast(
@@ -78,7 +79,12 @@ def run_sweep(verilog_path: str = "examples/PWM_CTRL_registered_bgr.v") -> List[
     }
     print(f"Truth tables ready in {time.time() - t0:.3f} s (2 x 2048 vectors)\n", flush=True)
 
-    # 2. Joint Multi-Output Espresso-MV for each DC mode
+    # 2. Formal FSM State-Space & Deadlock Verification Audit
+    state_verifier = StateSpaceVerifier(extractor)
+    state_audit = state_verifier.verify(tts_by_dc["exact"])
+    state_verifier.print_audit_report(state_audit)
+
+    # 3. Joint Multi-Output Espresso-MV for each DC mode
     engine = MultiOutputEspressoEngine(extractor.inputs)
     solutions = {}
     lec_results = {}
@@ -92,7 +98,7 @@ def run_sweep(verilog_path: str = "examples/PWM_CTRL_registered_bgr.v") -> List[
         lec_results[dc_mode] = lec
         print(f"Espresso-MV [{dc_mode}]: {len(shared_cubes)} unique shared cubes in {t_esp:.3f}s (Formal LEC: {'PASS' if lec else 'FAIL'})", flush=True)
 
-    # 3. High-impact parameter sweep grid
+    # 4. High-impact parameter sweep grid
     shannon_thresholds = [4, 8, 15]
     var_metrics = ["frequency", "control_priority"]
     fan_in_limits = [3, 4]
@@ -128,6 +134,7 @@ def run_sweep(verilog_path: str = "examples/PWM_CTRL_registered_bgr.v") -> List[
                             "enable_demorgan": True,
                             "enable_shannon": True,
                             "lec_passed": lec_results[dc_mode],
+                            "state_audit": state_audit,
                             "min_exprs": min_exprs,
                             "input_names": extractor.inputs,
                             "targets": extractor.comb_targets,
@@ -150,54 +157,60 @@ def run_sweep(verilog_path: str = "examples/PWM_CTRL_registered_bgr.v") -> List[
 
 
 def print_pareto_table(top10: List[Dict[str, Any]]):
-    print("=" * 105)
-    print("                      FULL OPTIMIZATION PARETO RESULTS TABLE (TOP 10)")
-    print("=" * 105)
-    header = f"{'Rank':<5} | {'GE':<6} | {'Trans':<6} | {'Cells':<6} | {'DC Mode':<15} | {'SH_Th':<5} | {'Metric':<16} | {'FanIn':<5} | {'TechMap':<7} | {'LEC':<5}"
+    print("=" * 115)
+    print("                              FULL OPTIMIZATION PARETO RESULTS TABLE (TOP 10)")
+    print("=" * 115)
+    header = f"{'Rank':<5} | {'GE':<6} | {'Trans':<6} | {'Cells':<6} | {'MUX':<5} | {'AND/OR':<7} | {'QM':<8} | {'SH':<4} | {'BUF':<5} | {'LEC':<5} | {'DC Mode / Metric'}"
     print(header)
-    print("-" * 105)
+    print("-" * 115)
     for idx, r in enumerate(top10, 1):
+        and_or = "True" if not r["enable_tech_mapping"] else "False"
+        qm_desc = "N/A(MV)"
         row = (
             f"{idx:<5} | "
             f"{r['total_ge']:<6.1f} | "
             f"{r['total_transistors']:<6} | "
             f"{r['total_cells']:<6} | "
-            f"{r['dc_relaxation']:<15} | "
-            f"{r['shannon_threshold']:<5} | "
-            f"{r['var_selection']:<16} | "
-            f"{r['max_fan_in']:<5} | "
-            f"{str(r['enable_tech_mapping']):<7} | "
-            f"{'PASS' if r['lec_passed'] else 'FAIL':<5}"
+            f"{'True':<5} | "
+            f"{and_or:<7} | "
+            f"{qm_desc:<8} | "
+            f"{r['shannon_threshold']:<4} | "
+            f"{'False':<5} | "
+            f"{'PASS' if r['lec_passed'] else 'FAIL':<5} | "
+            f"{r['dc_relaxation']}, {r['var_selection']}, fan={r['max_fan_in']}"
         )
         print(row)
-    print("=" * 105 + "\n", flush=True)
+    print("=" * 115 + "\n", flush=True)
 
 
 def print_winner_bom(winner: Dict[str, Any]):
-    print("=" * 60)
+    print("=" * 65)
     print("         RANK 1 WINNING CONFIGURATION: BILL OF MATERIALS")
-    print("=" * 60)
+    print("=" * 65)
     print(f"Configuration: {winner['name']}")
     print(f"DC Relaxation: {winner['dc_relaxation']}")
     print(f"Shannon Trigger Threshold: {winner['shannon_threshold']} cubes")
     print(f"Variable Selection: {winner['var_selection']}")
     print(f"Max Gate Fan-In: {winner['max_fan_in']}")
     print(f"Tech Mapping: {winner['enable_tech_mapping']}")
-    print("-" * 60)
+    print("-" * 65)
     print(f"Total Gate Equivalents (GE): {winner['total_ge']:.1f}")
     print(f"Estimated Transistor Count: {winner['total_transistors']}")
     print(f"Total Standard Cell Count:   {winner['total_cells']}")
     print(f"Formal Verification (LEC):   {'PASS' if winner['lec_passed'] else 'FAIL'}")
-    print("-" * 60)
+    if "state_audit" in winner and winner["state_audit"].get("is_sequential"):
+        audit = winner["state_audit"]
+        print(f"State-Space Deadlock Audit:  {audit['status']} ({audit['deadlocks_count']} deadlocks, max recovery: {audit['max_recovery_depth']} cycles)")
+    print("-" * 65)
     print(f"{'Cell Type':<15} | {'Count':<8} | {'Unit GE':<8} | {'Subtotal GE':<10}")
-    print("-" * 60)
+    print("-" * 65)
 
     from ams_optimizer.core.models import INVERTER_EQUIVALENTS
     for cell, count in sorted(winner["gate_counts"].items(), key=lambda x: -x[1]):
         unit_ge = INVERTER_EQUIVALENTS.get(cell, 3.0)
         sub_ge = count * unit_ge
         print(f"{cell:<15} | {count:<8} | {unit_ge:<8.2f} | {sub_ge:<10.2f}")
-    print("=" * 60 + "\n", flush=True)
+    print("=" * 65 + "\n", flush=True)
 
 
 if __name__ == "__main__":
