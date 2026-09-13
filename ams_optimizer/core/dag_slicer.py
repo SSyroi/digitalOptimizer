@@ -62,8 +62,12 @@ class VerilogDAGSlicer:
         dag = SlicedDAG(module_name="unknown")
         self._parse_module_header(dag)
         self._parse_declarations(dag)
-        self._parse_sequential_blocks(dag)
+        # Parse combinational blocks FIRST so intermediate DAG nodes
+        # (is_az_mode, eff_oc_mode, etc.) exist before sequential parsing.
+        # This lets _get_reg_dependencies reference them instead of flattening.
         self._parse_combinational_blocks(dag)
+        self._parse_sequential_blocks(dag)
+        self._eliminate_dead_nodes(dag)
         self._compute_topological_order(dag)
         return dag
 
@@ -271,6 +275,11 @@ class VerilogDAGSlicer:
             if tok_name in visited:
                 return set()
             visited.add(tok_name)
+            # Stop expansion at wires that already exist as intermediate DAG nodes.
+            # These will be treated as direct dependencies instead of being flattened
+            # to their underlying primary inputs.
+            if tok_name in dag.nodes or any(f"{tok_name}[{i}]" in dag.nodes for i in range(16)):
+                return {tok_name}
             if tok_name in wire_deps:
                 sub_res = set()
                 for sub_t in wire_deps[tok_name]:
@@ -292,6 +301,18 @@ class VerilogDAGSlicer:
                 needed_vars.update(dag.registers[base_tok].bit_names)
             elif base_tok in dag.ports and dag.ports[base_tok].direction == "input":
                 needed_vars.update(dag.ports[base_tok].bit_names)
+            elif base_tok in dag.nodes:
+                # Direct reference to an intermediate DAG node (e.g. is_az_mode)
+                needed_vars.add(base_tok)
+            elif any(f"{base_tok}[{i}]" in dag.nodes for i in range(16)):
+                # Multi-bit intermediate node (e.g. eff_oc_mode → eff_oc_mode[0], eff_oc_mode[1])
+                wire_or_port = dag.wires.get(base_tok) or dag.ports.get(base_tok)
+                if wire_or_port and wire_or_port.width > 1:
+                    for bn in wire_or_port.bit_names:
+                        if bn in dag.nodes:
+                            needed_vars.add(bn)
+                else:
+                    needed_vars.add(base_tok)
 
         clock_sig = reg.clock_signal if reg else "clk"
         reset_sig = reg.reset_signal if reg else "rst_n"
@@ -299,26 +320,63 @@ class VerilogDAGSlicer:
         return sorted(deps) if deps else [p for p in dag.primary_inputs if p not in ("clk", "rst_n", "rst", "reset")] + dag.register_q_bits
 
     def _synthesize_generic_reg_d(self, dag: SlicedDAG, r_name: str, reg: SlicedRegister, bit_idx: int, body: str):
-        """Builds next-state evaluator for FSM state registers and general registers using RTL simulator."""
+        """Builds next-state evaluator for FSM state registers and general registers using procedural AST."""
         b_name = f"{r_name}[{bit_idx}]" if reg.width > 1 else r_name
         node_name = f"{b_name}_d"
 
         candidate_inputs = self._get_reg_dependencies(dag, r_name, body)
 
-        if not hasattr(self, "_rtl_sim") or self._rtl_sim is None:
-            self._rtl_sim = RTLCombinationalSimulator(self.raw_code)
+        else_match = re.search(r"\belse\b", body)
+        active_body = body[else_match.end():].strip() if else_match else body
+        parser = VerilogProceduralParser(active_body)
+        stmts = parser.parse_statements(active_body)
 
-        target_sig = node_name
-        sim = self._rtl_sim
+        def make_reg_eval(target_r: str, b_idx: int, width: int, statements: List[Stmt], params: Dict[str, int]):
+            def _eval(inp: Dict[str, int]) -> int:
+                env = dict(params)
+                env.update(inp)
 
-        def make_eval(sig: str, simulator: RTLCombinationalSimulator):
-            return lambda inputs: simulator.simulate_vector(inputs).get(sig, 0)
+                # Assemble multi-bit register integers if bit-level inputs are in env
+                for r_n, r_obj in dag.registers.items():
+                    if r_n not in env and r_obj.width > 1:
+                        val = 0
+                        has_bits = False
+                        for b in range(r_obj.width):
+                            kb = f"{r_n}[{b}]"
+                            if kb in env:
+                                val |= (env[kb] << b)
+                                has_bits = True
+                        if has_bits:
+                            env[r_n] = val
+
+                for p_n, p_obj in {**dag.ports, **dag.wires}.items():
+                    if p_n not in env and p_obj.width > 1:
+                        val = 0
+                        has_bits = False
+                        for b in range(p_obj.width):
+                            kb = f"{p_n}[{b}]"
+                            if kb in env:
+                                val |= (env[kb] << b)
+                                has_bits = True
+                        if has_bits:
+                            env[p_n] = val
+
+                next_env = dict(env)
+                for s in statements:
+                    s.execute(env, next_env)
+
+                if width == 1:
+                    return next_env.get(target_r, 0)
+                else:
+                    return (next_env.get(target_r, 0) >> b_idx) & 1
+
+            return _eval
 
         dag.nodes[node_name] = DAGNode(
             name=node_name,
             node_type="register_d",
             inputs=candidate_inputs,
-            eval_fn=make_eval(target_sig, sim),
+            eval_fn=make_reg_eval(r_name, bit_idx, reg.width, stmts, dag.parameters),
             level=1,
             raw_expr=f"{r_name} next state bit {bit_idx}"
         )
@@ -540,6 +598,31 @@ class VerilogDAGSlicer:
                 level=2,
                 raw_expr=f"MUX({out})"
             )
+
+
+    def _eliminate_dead_nodes(self, dag: SlicedDAG):
+        """Removes intermediate DAG nodes with zero downstream fanout.
+
+        Iterates until stable, since removing a dead node may make its
+        input nodes dead too (if they have no other consumers).
+        """
+        changed = True
+        while changed:
+            changed = False
+            # Build fanout map
+            fanout: Dict[str, int] = {}
+            for node in dag.nodes.values():
+                for inp in node.inputs:
+                    fanout[inp] = fanout.get(inp, 0) + 1
+
+            dead_nodes = []
+            for name, node in dag.nodes.items():
+                if node.node_type == "intermediate" and fanout.get(name, 0) == 0:
+                    dead_nodes.append(name)
+
+            for name in dead_nodes:
+                del dag.nodes[name]
+                changed = True
 
     def _compute_topological_order(self, dag: SlicedDAG):
         """Orders nodes topologically so dependencies are evaluated first."""

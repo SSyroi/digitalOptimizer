@@ -192,12 +192,13 @@ always @(*) begin
   // 4. Charge Pump Control Output (oc_ctrl_cp)
   // Reuses the clean registered BGR control output without extra flip-flops.
   // Differentiates only during initial startup auto-zero sampling (CP samples for
-  // 2 cycles, remaining high at cnt=1).
+  // 2 cycles, remaining high at cnt=1). When RELAX_STARTUP=1, startup stagger is
+  // relaxed so CP purely tracks BGR/chopping with minimal logic.
   if (c_DfT_en_LP) begin
     oc_ctrl_cp = 1'b0;
   end else if (is_chop_mode) begin
     oc_ctrl_cp = ~oc_ctrl_bgr;
-  end else if (!c_DfT_en_PWM && is_az_mode && startup && (cnt == 4'd1)) begin
+  end else if (!RELAX_STARTUP && !c_DfT_en_PWM && is_az_mode && startup && (cnt == 4'd1)) begin
     oc_ctrl_cp = 1'b1;
   end else begin
     oc_ctrl_cp = oc_ctrl_bgr;
