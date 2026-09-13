@@ -25,6 +25,10 @@ class TechnologyMapper:
         self.inverter_pool: Dict[str, str] = {}
         self.shannon_mux = ShannonMUXDecomposer(self.map_truth_table)
 
+    def _calculate_ge_cost(self, node: MappedLogicNode) -> float:
+        from .models import INVERTER_EQUIVALENTS
+        return sum(count * INVERTER_EQUIVALENTS.get(gate, 3.0) for gate, count in node.gate_counts.items())
+
     def get_or_create_inverter(self, net_name: str) -> str:
         """Reuses inverted signals globally to avoid duplicate inverters."""
         if net_name.startswith("INV(") and net_name.endswith(")"):
@@ -65,13 +69,25 @@ class TechnologyMapper:
             if match_3:
                 return match_3
 
-        # 5. Shannon Decomposition Check (Extract MUX2 for 3 to 5 inputs)
+        # 5. Shannon Decomposition Check (Extract MUX2 / factored gates)
+        mux_match = None
         if k >= 3:
             mux_match = self.shannon_mux.try_decompose(tt)
-            if mux_match:
-                return mux_match
 
-        # 6. Fallback: Pure Quine-McCluskey SOP -> CMOS Gate Tree Mapping
+        # 6. Fallback or Competitor: Quine-McCluskey SOP (practical for k <= 5)
+        if k <= 5:
+            qm_match = self._map_quine_mccluskey(tt)
+            if mux_match is not None:
+                mux_cost = self._calculate_ge_cost(mux_match)
+                qm_cost = self._calculate_ge_cost(qm_match)
+                if mux_cost <= qm_cost:
+                    return mux_match
+                return qm_match
+            return qm_match
+
+        if mux_match is not None:
+            return mux_match
+
         return self._map_quine_mccluskey(tt)
 
     def _map_quine_mccluskey(self, tt: LocalTruthTable) -> MappedLogicNode:

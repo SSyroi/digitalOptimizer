@@ -7,23 +7,24 @@
 // Cadence Spectre & Virtuoso Compatible Verilog-A Model
 //
 // Circuit Complexity & Silicon Area Notes:
-//   - Total Gate Count         : 134 cells
-//   - Inverter Equivalents (GE) : 410.0 inverters (1 GE = 1 Inverter = 2 Transistors)
-//   - Est. Transistor Count    : ~820 transistors
+//   - Total Gate Count         : 114 cells
+//   - Inverter Equivalents (GE) : 507.0 inverters (1 GE = 1 Inverter = 2 Transistors)
+//   - Est. Transistor Count    : ~1014 transistors
 //
 // Standard Cell Breakdown (Gate Counts & Inverter Weights):
-//   - AND2    :  14 cells ( 42.0 inverters eq.,   84 transistors)
+//   - AND2    :  24 cells ( 72.0 inverters eq.,  144 transistors)
 //   - AND3    :   2 cells (  8.0 inverters eq.,   16 transistors)
-//   - DFFR    :   7 cells ( 56.0 inverters eq.,  112 transistors)
-//   - INV     :  14 cells ( 14.0 inverters eq.,   28 transistors)
-//   - MUX2    :  77 cells (231.0 inverters eq.,  462 transistors)
-//   - NAND2   :   4 cells (  8.0 inverters eq.,   16 transistors)
+//   - AND4    :   8 cells ( 40.0 inverters eq.,   80 transistors)
+//   - DFFR    :   7 cells (119.0 inverters eq.,  238 transistors)
+//   - INV     :  13 cells ( 13.0 inverters eq.,   26 transistors)
+//   - MUX2    :  22 cells (132.0 inverters eq.,  264 transistors)
+//   - NAND2   :   3 cells (  6.0 inverters eq.,   12 transistors)
 //   - NAND3   :   2 cells (  6.0 inverters eq.,   12 transistors)
 //   - NOR2    :   1 cells (  2.0 inverters eq.,    4 transistors)
 //   - NOR3    :   3 cells (  9.0 inverters eq.,   18 transistors)
-//   - OR2     :   6 cells ( 18.0 inverters eq.,   36 transistors)
-//   - OR3     :   1 cells (  4.0 inverters eq.,    8 transistors)
-//   - XOR2    :   3 cells ( 12.0 inverters eq.,   24 transistors)
+//   - OR2     :  22 cells ( 66.0 inverters eq.,  132 transistors)
+//   - OR3     :   4 cells ( 16.0 inverters eq.,   32 transistors)
+//   - XOR2    :   3 cells ( 18.0 inverters eq.,   36 transistors)
 // ============================================================================
 
 module PWM_CTRL_va (VDD, VSS, sub, res_n, c_DFT_en_LP, c_DFT_en_PWM, c_DfT_oc_dig_VDD, en_LP, oc_select, oc_ctrl_cp, oc_ctrl_bgr, clk_i, en_lowFreq, oc_select_ext, oc_ctrl_cp_ext, en_LP_ext, c_metalFix_invert_oc_defaults);
@@ -180,10 +181,10 @@ module PWM_CTRL_va (VDD, VSS, sub, res_n, c_DFT_en_LP, c_DFT_en_PWM, c_DfT_oc_di
   real oc_select_ext_val;
   real oc_ctrl_cp_ext_val;
   real en_LP_ext_val;
-  real oc_ctrl_bgr_val;
-  real oc_select_val;
   real en_lowFreq_val;
   real oc_ctrl_cp_val;
+  real oc_select_val;
+  real oc_ctrl_bgr_val;
   real en_LP_val;
 
   analog begin
@@ -226,9 +227,9 @@ module PWM_CTRL_va (VDD, VSS, sub, res_n, c_DFT_en_LP, c_DFT_en_PWM, c_DfT_oc_di
     cnt_1_d = XOR2(cnt_0_q, cnt_1_q);
     cnt_2_d = MUX2(cnt_2_q, AND2(cnt_0_q, cnt_1_q), NAND2(cnt_0_q, cnt_1_q));
     cnt_3_d = MUX2(cnt_3_q, AND3(cnt_0_q, cnt_1_q, cnt_2_q), NAND3(cnt_0_q, cnt_1_q, cnt_2_q));
-    startup_d = MUX2(startup_q, vlow, MUX2(cnt_0_q, vhigh, NAND3(cnt_1_q, cnt_2_q, cnt_3_q)));
+    startup_d = AND2(startup_q, OR2(INV(cnt_0_q), NAND3(cnt_1_q, cnt_2_q, cnt_3_q)));
     chopping_clk_d = INV(chopping_clk_q);
-    pwm_chop_d = MUX2(pwm_chop_q, MUX2(cnt_0_q, NOR3(cnt_1_q, cnt_2_q, cnt_3_q), vlow), MUX2(cnt_0_q, OR3(cnt_1_q, cnt_2_q, cnt_3_q), vhigh));
+    pwm_chop_d = MUX2(pwm_chop_q, AND2(INV(cnt_0_q), NOR3(cnt_1_q, cnt_2_q, cnt_3_q)), OR2(cnt_0_q, OR3(cnt_1_q, cnt_2_q, cnt_3_q)));
     eff_oc_mode_0_val = XOR2(V(c_DfT_oc_dig_VDD[0]), V(c_metalFix_invert_oc_defaults));
     eff_oc_mode_1_val = XOR2(V(c_DfT_oc_dig_VDD[1]), V(c_metalFix_invert_oc_defaults));
     is_az_mode_val = NOR2(eff_oc_mode_0_val, eff_oc_mode_1_val);
@@ -237,14 +238,14 @@ module PWM_CTRL_va (VDD, VSS, sub, res_n, c_DFT_en_LP, c_DFT_en_PWM, c_DfT_oc_di
     is_chop_mode_val = AND2(eff_oc_mode_0_val, eff_oc_mode_1_val);
     is_pwm_active_window_val = NOR3(cnt_1_q, cnt_2_q, cnt_3_q);
     is_pwm_sample_window_val = MUX2(cnt_0_q, NOR3(cnt_1_q, cnt_2_q, cnt_3_q), AND3(cnt_1_q, cnt_2_q, cnt_3_q));
-    oc_select_val = MUX2(V(c_DFT_en_LP), OR2(is_az_mode_val, is_chop_mode_val), vlow);
+    oc_select_val = AND2(INV(V(c_DFT_en_LP)), OR2(is_az_mode_val, is_chop_mode_val));
     oc_select_ext_val = oc_select_val;
-    oc_ctrl_cp_val = MUX2(V(c_DFT_en_LP), MUX2(V(c_DFT_en_PWM), MUX2(chopping_clk_q, MUX2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, AND2(is_az_mode_val, startup_q), vlow), vlow), vlow), MUX2(is_az_mode_val, vhigh, MUX2(cnt_1_q, MUX2(cnt_2_q, AND2(INV(cnt_3_q), startup_q), vlow), vlow))), OR2(is_az_mode_val, is_static_1_val)), vhigh), MUX2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, AND2(is_az_mode_val, startup_q), vlow), vlow), vlow), MUX2(is_az_mode_val, vhigh, MUX2(cnt_1_q, MUX2(cnt_2_q, AND2(INV(cnt_3_q), startup_q), vlow), vlow))), OR2(is_az_mode_val, is_static_1_val)), vlow)), MUX2(is_az_mode_val, MUX2(is_static_1_val, AND2(is_chop_mode_val, INV(pwm_chop_q)), NAND2(is_chop_mode_val, pwm_chop_q)), is_pwm_sample_window_val)), vlow);
+    oc_ctrl_cp_val = AND2(INV(V(c_DFT_en_LP)), MUX2(V(c_DFT_en_PWM), MUX2(chopping_clk_q, OR2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, AND2(INV(cnt_1_q), AND4(INV(cnt_2_q), INV(cnt_3_q), is_az_mode_val, startup_q)), OR2(INV(is_az_mode_val), AND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q))), OR2(is_az_mode_val, is_static_1_val))), AND2(INV(is_chop_mode_val), MUX2(cnt_0_q, MUX2(is_static_1_val, AND2(INV(cnt_1_q), AND4(INV(cnt_2_q), INV(cnt_3_q), is_az_mode_val, startup_q)), OR2(INV(is_az_mode_val), AND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q))), OR2(is_az_mode_val, is_static_1_val)))), MUX2(is_az_mode_val, OR2(AND2(is_chop_mode_val, INV(pwm_chop_q)), AND2(INV(is_chop_mode_val), is_static_1_val)), is_pwm_sample_window_val)));
     oc_ctrl_cp_ext_val = oc_ctrl_cp_val;
-    en_LP_val = MUX2(V(c_DFT_en_LP), AND2(V(c_DFT_en_PWM), INV(is_pwm_active_window_val)), vhigh);
+    en_LP_val = OR2(V(c_DFT_en_LP), AND2(V(c_DFT_en_PWM), INV(is_pwm_active_window_val)));
     en_LP_ext_val = en_LP_val;
-    oc_ctrl_bgr_val = MUX2(V(c_DFT_en_LP), MUX2(V(c_DFT_en_PWM), MUX2(chopping_clk_q, MUX2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, AND2(is_az_mode_val, startup_q), vlow), vlow), vlow), MUX2(is_az_mode_val, vhigh, MUX2(cnt_1_q, MUX2(cnt_2_q, AND2(INV(cnt_3_q), startup_q), vlow), vlow))), MUX2(is_static_1_val, MUX2(is_az_mode_val, vlow, MUX2(cnt_1_q, MUX2(cnt_2_q, OR2(INV(startup_q), cnt_3_q), vhigh), vhigh)), MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, NAND2(is_az_mode_val, startup_q), vhigh), vhigh), vhigh))), vlow), MUX2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, AND2(is_az_mode_val, startup_q), vlow), vlow), vlow), MUX2(is_az_mode_val, vhigh, MUX2(cnt_1_q, MUX2(cnt_2_q, AND2(INV(cnt_3_q), startup_q), vlow), vlow))), MUX2(is_static_1_val, MUX2(is_az_mode_val, vlow, MUX2(cnt_1_q, MUX2(cnt_2_q, OR2(INV(startup_q), cnt_3_q), vhigh), vhigh)), MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, NAND2(is_az_mode_val, startup_q), vhigh), vhigh), vhigh))), vhigh)), MUX2(is_az_mode_val, MUX2(is_chop_mode_val, is_static_1_val, pwm_chop_q), is_pwm_sample_window_val)), vlow);
-    en_lowFreq_val = MUX2(V(c_DFT_en_LP), MUX2(V(c_DFT_en_PWM), MUX2(cnt_0_q, MUX2(is_az_mode_val, vlow, MUX2(is_chop_mode_val, MUX2(cnt_1_q, MUX2(cnt_2_q, OR2(INV(startup_q), cnt_3_q), vhigh), vhigh), vlow)), vlow), INV(is_pwm_active_window_val)), vlow);
+    en_lowFreq_val = AND2(INV(V(c_DFT_en_LP)), MUX2(V(c_DFT_en_PWM), AND2(INV(cnt_0_q), AND2(is_az_mode_val, AND2(INV(is_chop_mode_val), OR2(cnt_1_q, OR3(cnt_2_q, cnt_3_q, INV(startup_q)))))), INV(is_pwm_active_window_val)));
+    oc_ctrl_bgr_val = AND2(INV(V(c_DFT_en_LP)), MUX2(V(c_DFT_en_PWM), MUX2(chopping_clk_q, AND2(INV(is_chop_mode_val), MUX2(cnt_0_q, MUX2(is_static_1_val, AND2(INV(cnt_1_q), AND4(INV(cnt_2_q), INV(cnt_3_q), is_az_mode_val, startup_q)), OR2(INV(is_az_mode_val), AND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q))), MUX2(is_static_1_val, AND2(is_az_mode_val, OR2(cnt_1_q, OR3(cnt_2_q, cnt_3_q, INV(startup_q)))), OR2(cnt_1_q, OR2(cnt_2_q, OR2(cnt_3_q, NAND2(is_az_mode_val, startup_q))))))), OR2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, AND2(INV(cnt_1_q), AND4(INV(cnt_2_q), INV(cnt_3_q), is_az_mode_val, startup_q)), OR2(INV(is_az_mode_val), AND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q))), MUX2(is_static_1_val, AND2(is_az_mode_val, OR2(cnt_1_q, OR3(cnt_2_q, cnt_3_q, INV(startup_q)))), OR2(cnt_1_q, OR2(cnt_2_q, OR2(cnt_3_q, NAND2(is_az_mode_val, startup_q)))))))), MUX2(is_az_mode_val, MUX2(is_chop_mode_val, is_static_1_val, pwm_chop_q), is_pwm_sample_window_val)));
 
     // Analog Electrical Output Drivers
     V(en_LP) <+ transition((en_LP_val > vth) ? vhigh : vlow, tdel, trise, tfall);

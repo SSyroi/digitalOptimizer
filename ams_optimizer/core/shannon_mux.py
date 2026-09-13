@@ -145,10 +145,47 @@ class ShannonMUXDecomposer:
                 res_d0 = self.map_fn(tt_d0)
                 res_d1 = self.map_fn(tt_d1)
 
-                # Avoid redundant MUX2 where both branches are identical
+                # 1. Avoid redundant MUX2 where both branches are identical
                 if res_d0.expression == res_d1.expression:
                     return res_d0
 
+                # 2. Both branches are constants
+                if res_d0.expression == "0.0" and res_d1.expression == "1.0":
+                    return MappedLogicNode(node_name=tt.node_name, expression=s)
+                if res_d0.expression == "1.0" and res_d1.expression == "0.0":
+                    return MappedLogicNode(node_name=tt.node_name, expression=f"INV({s})", gate_counts={"INV": 1})
+
+                # 3. D0 is constant 0.0 -> F = S & D1
+                if res_d0.expression == "0.0":
+                    gates = dict(res_d1.gate_counts)
+                    gates["AND2"] = gates.get("AND2", 0) + 1
+                    expr = f"AND2({s}, {res_d1.expression})"
+                    return MappedLogicNode(node_name=tt.node_name, expression=expr, gate_counts=gates)
+
+                # 4. D1 is constant 0.0 -> F = ~S & D0
+                if res_d1.expression == "0.0":
+                    gates = dict(res_d0.gate_counts)
+                    gates["INV"] = gates.get("INV", 0) + 1
+                    gates["AND2"] = gates.get("AND2", 0) + 1
+                    expr = f"AND2(INV({s}), {res_d0.expression})"
+                    return MappedLogicNode(node_name=tt.node_name, expression=expr, gate_counts=gates)
+
+                # 5. D0 is constant 1.0 -> F = ~S | D1
+                if res_d0.expression == "1.0":
+                    gates = dict(res_d1.gate_counts)
+                    gates["INV"] = gates.get("INV", 0) + 1
+                    gates["OR2"] = gates.get("OR2", 0) + 1
+                    expr = f"OR2(INV({s}), {res_d1.expression})"
+                    return MappedLogicNode(node_name=tt.node_name, expression=expr, gate_counts=gates)
+
+                # 6. D1 is constant 1.0 -> F = S | D0
+                if res_d1.expression == "1.0":
+                    gates = dict(res_d0.gate_counts)
+                    gates["OR2"] = gates.get("OR2", 0) + 1
+                    expr = f"OR2({s}, {res_d0.expression})"
+                    return MappedLogicNode(node_name=tt.node_name, expression=expr, gate_counts=gates)
+
+                # 7. General MUX2: neither cofactor is constant
                 gates = {"MUX2": 1}
                 for g, cnt in res_d0.gate_counts.items():
                     gates[g] = gates.get(g, 0) + cnt

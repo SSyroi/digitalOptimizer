@@ -71,20 +71,12 @@ class AMSOptimizer:
 
         # Step 5: Aggregate Gate Breakdown, Inverter Equivalents & Transistor Cost
         gate_breakdown: Dict[str, int] = {}
-        
-        # Add Flip-Flops
-        for reg in dag.registers.values():
-            ff_type = "DFFR" if reg.reset_signal else "DFF"
-            gate_breakdown[ff_type] = gate_breakdown.get(ff_type, 0) + reg.width
+        for inst in structural_netlist.instances:
+            gate_breakdown[inst.cell_type] = gate_breakdown.get(inst.cell_type, 0) + 1
 
-        # Add mapped gates
-        for mn in mapped_nodes.values():
-            for g, cnt in mn.gate_counts.items():
-                gate_breakdown[g] = gate_breakdown.get(g, 0) + cnt
-
-        total_gates = sum(gate_breakdown.values())
-        total_ge = sum(cnt * INVERTER_EQUIVALENTS.get(g, 2.0) for g, cnt in gate_breakdown.items())
-        total_transistors = sum(cnt * TRANSISTOR_COST.get(g, 6) for g, cnt in gate_breakdown.items())
+        total_gates = structural_netlist.total_gates
+        total_ge = structural_netlist.total_inverter_equivalents
+        total_transistors = structural_netlist.total_transistors
 
         # Step 6: Formal Logic Equivalence Checking (LEC)
         equivalence_result = None
