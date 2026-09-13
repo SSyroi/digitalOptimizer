@@ -89,7 +89,7 @@ class AMSOptimizer:
         # Step 6: Formal Logic Equivalence Checking (LEC)
         equivalence_result = None
         if self.run_verification:
-            checker = FormalEquivalenceChecker(dag, mapped_nodes)
+            checker = FormalEquivalenceChecker(dag, mapped_nodes, verilog_code=verilog_code)
             equivalence_result = checker.verify()
 
         # Step 7: Emit Deliverables (Verilog-A & Virtuoso SKILL)

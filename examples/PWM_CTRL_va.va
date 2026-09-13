@@ -180,11 +180,11 @@ module PWM_CTRL_va (VDD, VSS, sub, res_n, c_DFT_en_LP, c_DFT_en_PWM, c_DfT_oc_di
   real oc_select_ext_val;
   real oc_ctrl_cp_ext_val;
   real en_LP_ext_val;
+  real oc_ctrl_bgr_val;
   real oc_select_val;
   real en_lowFreq_val;
-  real en_LP_val;
   real oc_ctrl_cp_val;
-  real oc_ctrl_bgr_val;
+  real en_LP_val;
 
   analog begin
     @(initial_step) begin
@@ -243,8 +243,8 @@ module PWM_CTRL_va (VDD, VSS, sub, res_n, c_DFT_en_LP, c_DFT_en_PWM, c_DfT_oc_di
     oc_ctrl_cp_ext_val = oc_ctrl_cp_val;
     en_LP_val = MUX2(V(c_DFT_en_LP), AND2(V(c_DFT_en_PWM), INV(is_pwm_active_window_val)), vhigh);
     en_LP_ext_val = en_LP_val;
-    en_lowFreq_val = MUX2(V(c_DFT_en_LP), MUX2(V(c_DFT_en_PWM), MUX2(cnt_0_q, MUX2(is_az_mode_val, vlow, MUX2(is_chop_mode_val, MUX2(cnt_1_q, MUX2(cnt_2_q, OR2(INV(startup_q), cnt_3_q), vhigh), vhigh), vlow)), vlow), INV(is_pwm_active_window_val)), vlow);
     oc_ctrl_bgr_val = MUX2(V(c_DFT_en_LP), MUX2(V(c_DFT_en_PWM), MUX2(chopping_clk_q, MUX2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, AND2(is_az_mode_val, startup_q), vlow), vlow), vlow), MUX2(is_az_mode_val, vhigh, MUX2(cnt_1_q, MUX2(cnt_2_q, AND2(INV(cnt_3_q), startup_q), vlow), vlow))), MUX2(is_static_1_val, MUX2(is_az_mode_val, vlow, MUX2(cnt_1_q, MUX2(cnt_2_q, OR2(INV(startup_q), cnt_3_q), vhigh), vhigh)), MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, NAND2(is_az_mode_val, startup_q), vhigh), vhigh), vhigh))), vlow), MUX2(is_chop_mode_val, MUX2(cnt_0_q, MUX2(is_static_1_val, MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, AND2(is_az_mode_val, startup_q), vlow), vlow), vlow), MUX2(is_az_mode_val, vhigh, MUX2(cnt_1_q, MUX2(cnt_2_q, AND2(INV(cnt_3_q), startup_q), vlow), vlow))), MUX2(is_static_1_val, MUX2(is_az_mode_val, vlow, MUX2(cnt_1_q, MUX2(cnt_2_q, OR2(INV(startup_q), cnt_3_q), vhigh), vhigh)), MUX2(cnt_1_q, MUX2(cnt_2_q, MUX2(cnt_3_q, NAND2(is_az_mode_val, startup_q), vhigh), vhigh), vhigh))), vhigh)), MUX2(is_az_mode_val, MUX2(is_chop_mode_val, is_static_1_val, pwm_chop_q), is_pwm_sample_window_val)), vlow);
+    en_lowFreq_val = MUX2(V(c_DFT_en_LP), MUX2(V(c_DFT_en_PWM), MUX2(cnt_0_q, MUX2(is_az_mode_val, vlow, MUX2(is_chop_mode_val, MUX2(cnt_1_q, MUX2(cnt_2_q, OR2(INV(startup_q), cnt_3_q), vhigh), vhigh), vlow)), vlow), INV(is_pwm_active_window_val)), vlow);
 
     // Analog Electrical Output Drivers
     V(en_LP) <+ transition((en_LP_val > vth) ? vhigh : vlow, tdel, trise, tfall);

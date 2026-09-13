@@ -20,6 +20,7 @@ from .models import (
     EquivalenceResult,
 )
 from .reachability import FSMReachabilityAnalyzer
+from .rtl_simulator import RTLCombinationalSimulator
 
 
 class StandardCellEvaluator:
@@ -145,11 +146,18 @@ class StandardCellEvaluator:
 
 
 class FormalEquivalenceChecker:
-    """Performs combinatorial and sequential logic equivalence checking."""
+    """Performs combinatorial and sequential logic equivalence checking.
 
-    def __init__(self, dag: SlicedDAG, mapped_nodes: Dict[str, MappedLogicNode]):
+    The golden reference is the RTL simulator (not the DAG eval_fn),
+    so the checker detects bugs in ANY downstream transformation stage.
+    """
+
+    def __init__(self, dag: SlicedDAG, mapped_nodes: Dict[str, MappedLogicNode],
+                 verilog_code: Optional[str] = None):
         self.dag = dag
         self.mapped_nodes = mapped_nodes
+        self.verilog_code = verilog_code
+        self.rtl_sim = RTLCombinationalSimulator(verilog_code) if verilog_code else None
         self.reachability = FSMReachabilityAnalyzer(dag)
 
     def verify(self, max_exhaustive_vectors: int = 16384) -> EquivalenceResult:
@@ -222,15 +230,30 @@ class FormalEquivalenceChecker:
                             is_dont_care = True
                             break
 
-            # 3. Simulate Golden Network (Topological DAG evaluation using node.eval_fn)
-            env_golden = dict(stimulus)
-            for node_name in self.dag.topo_order:
-                node = self.dag.nodes.get(node_name)
-                if node:
-                    try:
-                        env_golden[node_name] = 1 if node.eval_fn(env_golden) else 0
-                    except Exception as e:
-                        raise RuntimeError(f"DAG node '{node_name}' golden eval_fn failed: {e}") from e
+            # 3. Simulate Golden Network using RTL Simulator (single source of truth)
+            if self.rtl_sim:
+                rtl_out = self.rtl_sim.simulate_vector(stimulus)
+                env_golden = dict(stimulus)
+                env_golden.update(rtl_out)
+                # Also populate intermediate nodes from DAG for mapped cell evaluation
+                for node_name in self.dag.topo_order:
+                    if node_name not in env_golden:
+                        node = self.dag.nodes.get(node_name)
+                        if node:
+                            try:
+                                env_golden[node_name] = 1 if node.eval_fn(env_golden) else 0
+                            except Exception as e:
+                                raise RuntimeError(f"DAG node '{node_name}' golden eval_fn failed: {e}") from e
+            else:
+                # Fallback: DAG eval_fn (when no verilog_code provided)
+                env_golden = dict(stimulus)
+                for node_name in self.dag.topo_order:
+                    node = self.dag.nodes.get(node_name)
+                    if node:
+                        try:
+                            env_golden[node_name] = 1 if node.eval_fn(env_golden) else 0
+                        except Exception as e:
+                            raise RuntimeError(f"DAG node '{node_name}' golden eval_fn failed: {e}") from e
 
             # 4. Simulate Optimized Standard-Cell Network (Topological gate evaluation)
             env_mapped = dict(stimulus)

@@ -7,21 +7,21 @@
 // Cadence Spectre & Virtuoso Compatible Verilog-A Model
 //
 // Circuit Complexity & Silicon Area Notes:
-//   - Total Gate Count         : 81 cells
-//   - Inverter Equivalents (GE) : 250.0 inverters (1 GE = 1 Inverter = 2 Transistors)
-//   - Est. Transistor Count    : ~500 transistors
+//   - Total Gate Count         : 73 cells
+//   - Inverter Equivalents (GE) : 248.0 inverters (1 GE = 1 Inverter = 2 Transistors)
+//   - Est. Transistor Count    : ~496 transistors
 //
 // Standard Cell Breakdown (Gate Counts & Inverter Weights):
-//   - AND2    :  10 cells ( 30.0 inverters eq.,   60 transistors)
-//   - AND3    :   8 cells ( 32.0 inverters eq.,   64 transistors)
-//   - AND4    :   4 cells ( 20.0 inverters eq.,   40 transistors)
+//   - AND2    :   7 cells ( 21.0 inverters eq.,   42 transistors)
 //   - DFFR    :   8 cells ( 64.0 inverters eq.,  128 transistors)
-//   - INV     :  25 cells ( 25.0 inverters eq.,   50 transistors)
-//   - MUX2    :   7 cells ( 21.0 inverters eq.,   42 transistors)
-//   - NOR2    :   1 cells (  2.0 inverters eq.,    4 transistors)
-//   - OR2     :  16 cells ( 48.0 inverters eq.,   96 transistors)
-//   - OR3     :   1 cells (  4.0 inverters eq.,    8 transistors)
-//   - XOR2    :   1 cells (  4.0 inverters eq.,    8 transistors)
+//   - INV     :   7 cells (  7.0 inverters eq.,   14 transistors)
+//   - MUX2    :  36 cells (108.0 inverters eq.,  216 transistors)
+//   - NAND2   :   1 cells (  2.0 inverters eq.,    4 transistors)
+//   - NOR2    :   3 cells (  6.0 inverters eq.,   12 transistors)
+//   - NOR3    :   1 cells (  3.0 inverters eq.,    6 transistors)
+//   - OR2     :   3 cells (  9.0 inverters eq.,   18 transistors)
+//   - OR3     :   4 cells ( 16.0 inverters eq.,   32 transistors)
+//   - XOR2    :   3 cells ( 12.0 inverters eq.,   24 transistors)
 // ============================================================================
 
 module sar_adc_ctrl_va (clk, rst_n, start, comp_out, dac_code, eoc, valid);
@@ -51,82 +51,92 @@ module sar_adc_ctrl_va (clk, rst_n, start, comp_out, dac_code, eoc, valid);
   // Analog Standard Cell Helper Functions
   analog function real INV;
     input a; real a;
-    INV = !(a > vth) ? 1.0 : 0.0;
+    INV = !(a > 0.900) ? 1.800 : 0.000;
   endfunction
 
   analog function real NAND2;
     input a, b; real a, b;
-    NAND2 = !((a > vth) && (b > vth)) ? 1.0 : 0.0;
+    NAND2 = !((a > 0.900) && (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real AND2;
     input a, b; real a, b;
-    AND2 = ((a > vth) && (b > vth)) ? 1.0 : 0.0;
+    AND2 = ((a > 0.900) && (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real NOR2;
     input a, b; real a, b;
-    NOR2 = !((a > vth) || (b > vth)) ? 1.0 : 0.0;
+    NOR2 = !((a > 0.900) || (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real OR2;
     input a, b; real a, b;
-    OR2 = ((a > vth) || (b > vth)) ? 1.0 : 0.0;
+    OR2 = ((a > 0.900) || (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real XOR2;
     input a, b; real a, b;
-    XOR2 = ((a > vth) != (b > vth)) ? 1.0 : 0.0;
+    XOR2 = ((a > 0.900) != (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real XNOR2;
     input a, b; real a, b;
-    XNOR2 = ((a > vth) == (b > vth)) ? 1.0 : 0.0;
+    XNOR2 = ((a > 0.900) == (b > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real MUX2;
     input s, d0, d1; real s, d0, d1;
-    MUX2 = (s > vth) ? d1 : d0;
+    MUX2 = (s > 0.900) ? d1 : d0;
   endfunction
 
   analog function real AOI21;
     input a, b, c; real a, b, c;
-    AOI21 = !(((a > vth) && (b > vth)) || (c > vth)) ? 1.0 : 0.0;
+    AOI21 = !(((a > 0.900) && (b > 0.900)) || (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real OAI21;
     input a, b, c; real a, b, c;
-    OAI21 = !(((a > vth) || (b > vth)) && (c > vth)) ? 1.0 : 0.0;
+    OAI21 = !(((a > 0.900) || (b > 0.900)) && (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real NAND3;
     input a, b, c; real a, b, c;
-    NAND3 = !((a > vth) && (b > vth) && (c > vth)) ? 1.0 : 0.0;
+    NAND3 = !((a > 0.900) && (b > 0.900) && (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real AND3;
     input a, b, c; real a, b, c;
-    AND3 = ((a > vth) && (b > vth) && (c > vth)) ? 1.0 : 0.0;
+    AND3 = ((a > 0.900) && (b > 0.900) && (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real NOR3;
     input a, b, c; real a, b, c;
-    NOR3 = !((a > vth) || (b > vth) || (c > vth)) ? 1.0 : 0.0;
+    NOR3 = !((a > 0.900) || (b > 0.900) || (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real OR3;
     input a, b, c; real a, b, c;
-    OR3 = ((a > vth) || (b > vth) || (c > vth)) ? 1.0 : 0.0;
+    OR3 = ((a > 0.900) || (b > 0.900) || (c > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real NAND4;
     input a, b, c, d; real a, b, c, d;
-    NAND4 = !((a > vth) && (b > vth) && (c > vth) && (d > vth)) ? 1.0 : 0.0;
+    NAND4 = !((a > 0.900) && (b > 0.900) && (c > 0.900) && (d > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   analog function real AND4;
     input a, b, c, d; real a, b, c, d;
-    AND4 = ((a > vth) && (b > vth) && (c > vth) && (d > vth)) ? 1.0 : 0.0;
+    AND4 = ((a > 0.900) && (b > 0.900) && (c > 0.900) && (d > 0.900)) ? 1.800 : 0.000;
+  endfunction
+
+  analog function real NOR4;
+    input a, b, c, d; real a, b, c, d;
+    NOR4 = !((a > 0.900) || (b > 0.900) || (c > 0.900) || (d > 0.900)) ? 1.800 : 0.000;
+  endfunction
+
+  analog function real OR4;
+    input a, b, c, d; real a, b, c, d;
+    OR4 = ((a > 0.900) || (b > 0.900) || (c > 0.900) || (d > 0.900)) ? 1.800 : 0.000;
   endfunction
 
   // Internal State & Combinational Signals
@@ -146,7 +156,19 @@ module sar_adc_ctrl_va (clk, rst_n, start, comp_out, dac_code, eoc, valid);
   real valid_val;
 
   analog begin
-    @(initial_step("static", "ac")) begin
+    @(initial_step) begin
+      dac_reg_0_q = vlow;
+      dac_reg_1_q = vlow;
+      dac_reg_2_q = vlow;
+      dac_reg_3_q = vlow;
+      state_0_q = vlow;
+      state_1_q = vlow;
+      state_2_q = vlow;
+      eoc_reg_q = vlow;
+    end
+
+    // Asynchronous Reset Event: rst_n falling edge (active low)
+    @(cross(V(rst_n) - vth, -1)) begin
       dac_reg_0_q = vlow;
       dac_reg_1_q = vlow;
       dac_reg_2_q = vlow;
@@ -159,25 +181,27 @@ module sar_adc_ctrl_va (clk, rst_n, start, comp_out, dac_code, eoc, valid);
 
     // Sequential Register Bank Clock Edge Sampling
     @(cross(V(clk) - vth, +1)) begin
-      dac_reg_0_q = (dac_reg_0_d > vth) ? vhigh : vlow;
-      dac_reg_1_q = (dac_reg_1_d > vth) ? vhigh : vlow;
-      dac_reg_2_q = (dac_reg_2_d > vth) ? vhigh : vlow;
-      dac_reg_3_q = (dac_reg_3_d > vth) ? vhigh : vlow;
-      state_0_q = (state_0_d > vth) ? vhigh : vlow;
-      state_1_q = (state_1_d > vth) ? vhigh : vlow;
-      state_2_q = (state_2_d > vth) ? vhigh : vlow;
-      eoc_reg_q = (eoc_reg_d > vth) ? vhigh : vlow;
+      if (V(rst_n) > vth) begin
+        dac_reg_0_q = (dac_reg_0_d > vth) ? vhigh : vlow;
+        dac_reg_1_q = (dac_reg_1_d > vth) ? vhigh : vlow;
+        dac_reg_2_q = (dac_reg_2_d > vth) ? vhigh : vlow;
+        dac_reg_3_q = (dac_reg_3_d > vth) ? vhigh : vlow;
+        state_0_q = (state_0_d > vth) ? vhigh : vlow;
+        state_1_q = (state_1_d > vth) ? vhigh : vlow;
+        state_2_q = (state_2_d > vth) ? vhigh : vlow;
+        eoc_reg_q = (eoc_reg_d > vth) ? vhigh : vlow;
+      end
     end
 
     // Multi-Level Combinational Logic Evaluations
-    dac_reg_0_d = OR2(OR2(OR2(OR2(AND2(dac_reg_0_q, state_0_q), AND2(dac_reg_0_q, state_1_q)), AND3(INV(V(start)), dac_reg_0_q, INV(state_2_q))), AND3(INV(state_2_q), state_1_q, state_0_q)), AND4(V(comp_out), state_2_q, INV(state_1_q), INV(state_0_q)));
-    dac_reg_1_d = OR2(OR2(OR2(OR2(AND3(INV(state_2_q), state_1_q, INV(state_0_q)), AND3(V(comp_out), INV(state_2_q), state_1_q)), AND3(dac_reg_1_q, INV(state_1_q), state_0_q)), AND2(dac_reg_1_q, state_2_q)), AND3(INV(V(start)), dac_reg_1_q, INV(state_0_q)));
-    dac_reg_2_d = OR2(OR2(OR2(OR2(AND2(dac_reg_2_q, state_0_q), AND4(V(comp_out), INV(state_2_q), state_1_q, INV(state_0_q))), AND3(INV(state_2_q), INV(state_1_q), state_0_q)), AND3(INV(V(start)), dac_reg_2_q, INV(state_1_q))), AND2(dac_reg_2_q, state_2_q));
-    dac_reg_3_d = OR2(OR2(OR2(OR2(AND2(dac_reg_3_q, state_1_q), AND4(V(start), INV(state_2_q), INV(state_1_q), INV(state_0_q))), AND4(V(comp_out), INV(state_2_q), INV(state_1_q), state_0_q)), AND2(dac_reg_3_q, INV(state_0_q))), AND2(dac_reg_3_q, state_2_q));
-    state_0_d = MUX2(V(start), MUX2(state_2_q, AND2(state_1_q, INV(state_0_q)), 0.0), MUX2(state_2_q, INV(state_0_q), 0.0));
-    state_1_d = MUX2(state_2_q, XOR2(state_1_q, state_0_q), 0.0);
-    state_2_d = MUX2(state_2_q, AND2(state_1_q, state_0_q), 0.0);
-    eoc_reg_d = MUX2(eoc_reg_q, MUX2(state_2_q, 0.0, NOR2(state_1_q, state_0_q)), OR3(state_2_q, state_1_q, state_0_q));
+    dac_reg_0_d = MUX2(V(comp_out), MUX2(dac_reg_0_q, MUX2(state_0_q, vlow, AND2(state_1_q, INV(state_2_q))), MUX2(state_0_q, MUX2(state_1_q, NOR2(V(start), state_2_q), vhigh), vhigh)), MUX2(dac_reg_0_q, MUX2(state_0_q, AND2(INV(state_1_q), state_2_q), AND2(state_1_q, INV(state_2_q))), MUX2(V(start), vhigh, OR3(state_0_q, state_1_q, state_2_q))));
+    dac_reg_1_d = MUX2(V(comp_out), MUX2(dac_reg_1_q, MUX2(state_0_q, AND2(state_1_q, INV(state_2_q)), vlow), MUX2(state_2_q, MUX2(V(start), NAND2(state_0_q, state_1_q), XOR2(state_0_q, state_1_q)), vhigh)), MUX2(dac_reg_1_q, AND2(state_1_q, INV(state_2_q)), MUX2(V(start), vhigh, OR3(state_0_q, state_1_q, state_2_q))));
+    dac_reg_2_d = MUX2(V(comp_out), MUX2(dac_reg_2_q, MUX2(state_0_q, vlow, NOR2(state_1_q, state_2_q)), MUX2(state_0_q, MUX2(state_2_q, NOR2(V(start), state_1_q), vhigh), vhigh)), MUX2(dac_reg_2_q, MUX2(state_2_q, XOR2(state_0_q, state_1_q), vlow), MUX2(V(start), vhigh, OR3(state_0_q, state_1_q, state_2_q))));
+    dac_reg_3_d = MUX2(V(comp_out), MUX2(dac_reg_3_q, MUX2(V(start), vlow, NOR3(state_0_q, state_1_q, state_2_q)), MUX2(state_0_q, vhigh, OR2(state_1_q, state_2_q))), MUX2(dac_reg_3_q, MUX2(state_1_q, MUX2(state_2_q, OR2(V(start), state_0_q), vlow), vlow), vhigh));
+    state_0_d = MUX2(state_0_q, MUX2(state_2_q, OR2(V(start), state_1_q), vlow), vlow);
+    state_1_d = MUX2(state_2_q, XOR2(state_0_q, state_1_q), vlow);
+    state_2_d = MUX2(state_0_q, vlow, AND2(state_1_q, INV(state_2_q)));
+    eoc_reg_d = MUX2(eoc_reg_q, MUX2(state_0_q, AND2(INV(state_1_q), state_2_q), vlow), OR3(state_0_q, state_1_q, state_2_q));
     dac_code_0_val = dac_reg_0_q;
     dac_code_1_val = dac_reg_1_q;
     dac_code_2_val = dac_reg_2_q;
