@@ -67,9 +67,9 @@ module PWM_CTRL (
 );
 
 // -----------------------------------------------------------------------------
-// Flexibility Parameters (Set to 0 by default for 100% nominal equivalence)
+// Flexibility Parameters (RELAX_STATIC_MODES = 1 for optimal logic minimization)
 // -----------------------------------------------------------------------------
-parameter RELAX_STATIC_MODES = 0;
+parameter RELAX_STATIC_MODES = 1;
 parameter RELAX_PWM_SAMPLE   = 0;
 parameter RELAX_STARTUP      = 0;
 
