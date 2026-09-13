@@ -63,24 +63,26 @@ class UnifiedVerilogNetlistEmitter:
         lines.append("  output wire oc_select_ext, oc_ctrl_cp_ext, en_LP_ext;")
         lines.append("")
 
-        var_names = [
-            "c_DfT_en_LP", "c_DfT_en_PWM", "c_DfT_oc_dig_VDD[1]",
-            "c_DfT_oc_dig_VDD[0]", "c_metalFix_invert_oc_defaults",
-            "oc_ctrl_bgr_q", "cnt_3_q", "cnt_2_q", "cnt_1_q", "cnt_0_q", "startup_q"
-        ]
-        var_ident_map = {
-            "c_DfT_en_LP": "c_DfT_en_LP",
-            "c_DfT_en_PWM": "c_DfT_en_PWM",
-            "c_DfT_oc_dig_VDD[1]": "c_DfT_oc_dig_VDD_1",
-            "c_DfT_oc_dig_VDD[0]": "c_DfT_oc_dig_VDD_0",
-            "c_metalFix_invert_oc_defaults": "c_metalFix_invert_oc_defaults",
-            "oc_ctrl_bgr_q": "oc_ctrl_bgr_q",
-            "cnt_3_q": "cnt_3_q",
-            "cnt_2_q": "cnt_2_q",
-            "cnt_1_q": "cnt_1_q",
-            "cnt_0_q": "cnt_0_q",
-            "startup_q": "startup_q",
-        }
+        var_names = []
+        var_ident_map = {}
+        for inp in self.input_names:
+            if "c_DfT_oc_dig_VDD[" in inp:
+                bit = inp.split("[")[1].split("]")[0]
+                ident = f"c_DfT_oc_dig_VDD_{bit}"
+                var_names.append(inp)
+                var_ident_map[inp] = ident
+            elif inp in ("c_DfT_en_LP", "c_DfT_en_PWM", "c_metalFix_invert_oc_defaults"):
+                var_names.append(inp)
+                var_ident_map[inp] = inp
+            elif "cnt[" in inp:
+                bit = inp.split("[")[1].split("]")[0]
+                ident = f"cnt_{bit}_q"
+                var_names.append(ident)
+                var_ident_map[ident] = ident
+            else:
+                ident = f"{inp}_q"
+                var_names.append(ident)
+                var_ident_map[ident] = ident
 
         # Extract Unique Cubes & Build Map
         unique_cubes: List[Tuple[str, Any]] = []
@@ -128,6 +130,30 @@ class UnifiedVerilogNetlistEmitter:
             lines.append(f"  INV_X1  U_inv_{v_ident:<28} (.A({v}), .Y(w_inv_{v_ident}));")
         lines.append("")
 
+        def emit_cube_nand_tree(lits: List[str], target_wire: str, prefix: str) -> List[str]:
+            k = len(lits)
+            if k == 1:
+                return [f"  INV_X1 U_{prefix} (.A({lits[0]}), .Y({target_wire}));"]
+            elif k == 2:
+                return [f"  NAND2_X1 U_{prefix} (.A({lits[0]}), .B({lits[1]}), .Y({target_wire}));"]
+            elif k == 3:
+                return [f"  NAND3_X1 U_{prefix} (.A({lits[0]}), .B({lits[1]}), .C({lits[2]}), .Y({target_wire}));"]
+            elif k == 4:
+                return [f"  NAND4_X1 U_{prefix} (.A({lits[0]}), .B({lits[1]}), .C({lits[2]}), .D({lits[3]}), .Y({target_wire}));"]
+            else:
+                out = []
+                inv_chunks = []
+                for i in range(0, k, 4):
+                    chunk = lits[i:i+4]
+                    w_nand = f"w_{prefix}_n{i//4}"
+                    w_inv = f"w_{prefix}_i{i//4}"
+                    out.append(f"  wire {w_nand}, {w_inv};")
+                    out.extend(emit_cube_nand_tree(chunk, w_nand, f"{prefix}_n{i//4}"))
+                    out.append(f"  INV_X1 U_{prefix}_inv{i//4} (.A({w_nand}), .Y({w_inv}));")
+                    inv_chunks.append(w_inv)
+                out.extend(emit_cube_nand_tree(inv_chunks, target_wire, f"{prefix}_root"))
+                return out
+
         # Shared Cube Gate Instantiations
         lines.append(f"  // 2. Shared Intermediate Product Term Gates ({len(unique_cubes)} unique NAND cells)")
         for idx, (c_str, c_expr) in enumerate(unique_cubes):
@@ -145,15 +171,8 @@ class UnifiedVerilogNetlistEmitter:
                         var_idx = int(str(l).split("_")[1])
                         lits.append(var_names[var_idx])
 
-                k = len(lits)
-                if k == 2:
-                    lines.append(f"  NAND2_X1 U_c{idx:<2} (.A({lits[0]}), .B({lits[1]}), .Y(w_c{idx})); {u_cmt}")
-                elif k == 3:
-                    lines.append(f"  NAND3_X1 U_c{idx:<2} (.A({lits[0]}), .B({lits[1]}), .C({lits[2]}), .Y(w_c{idx})); {u_cmt}")
-                elif k == 4:
-                    lines.append(f"  NAND4_X1 U_c{idx:<2} (.A({lits[0]}), .B({lits[1]}), .C({lits[2]}), .D({lits[3]}), .Y(w_c{idx})); {u_cmt}")
-                else:
-                    lines.append(f"  NAND4_X1 U_c{idx:<2} (.A({lits[0]}), .B({lits[1]}), .C({lits[2]}), .D({lits[3]}), .Y(w_c{idx})); {u_cmt}")
+                lines.append(f"  {u_cmt}")
+                lines.extend(emit_cube_nand_tree(lits, f"w_c{idx}", f"c{idx}"))
             elif isinstance(c_expr, Complement):
                 var_idx = int(str(c_expr.top).split("_")[1])
                 v = var_names[var_idx]
@@ -179,40 +198,58 @@ class UnifiedVerilogNetlistEmitter:
             "startup_d": "startup_d",
         }
 
+        def emit_nand_or_tree(inputs: List[str], target_net: str, prefix: str) -> List[str]:
+            k = len(inputs)
+            if k == 1:
+                return [f"  assign {target_net} = {inputs[0]};"]
+            elif k == 2:
+                return [f"  NAND2_X1 U_{prefix} (.A({inputs[0]}), .B({inputs[1]}), .Y({target_net}));"]
+            elif k == 3:
+                return [f"  NAND3_X1 U_{prefix} (.A({inputs[0]}), .B({inputs[1]}), .C({inputs[2]}), .Y({target_net}));"]
+            elif k == 4:
+                return [f"  NAND4_X1 U_{prefix} (.A({inputs[0]}), .B({inputs[1]}), .C({inputs[2]}), .D({inputs[3]}), .Y({target_net}));"]
+            else:
+                out_lines = []
+                chunk_outputs = []
+                for i in range(0, k, 4):
+                    chunk = inputs[i:i+4]
+                    c_out = f"w_{prefix}_ch{i//4}"
+                    out_lines.append(f"  wire {c_out};")
+                    out_lines.extend(emit_nand_or_tree(chunk, c_out, f"{prefix}_ch{i//4}"))
+                    inv_out = f"w_{prefix}_inv_ch{i//4}"
+                    out_lines.append(f"  wire {inv_out};")
+                    out_lines.append(f"  INV_X1 U_{prefix}_inv{i//4} (.A({c_out}), .Y({inv_out}));")
+                    chunk_outputs.append(inv_out)
+                out_lines.extend(emit_nand_or_tree(chunk_outputs, target_net, f"{prefix}_root"))
+                return out_lines
+
         for tgt in self.targets:
             out_wire = target_wire_map.get(tgt, tgt)
             expr = self.min_exprs.get(tgt)
             if expr is None:
                 continue
 
+            clean_tgt = tgt.replace('[','_').replace(']','')
             if str(expr) == "0":
                 lines.append(f"  assign {out_wire} = 1'b0;")
             elif str(expr) == "1":
                 lines.append(f"  assign {out_wire} = 1'b1;")
             elif isinstance(expr, OrOp):
                 inputs_to_nand = [f"w_c{cube_map[str(c)]}" for c in expr.xs]
-                k = len(inputs_to_nand)
-                if k == 2:
-                    lines.append(f"  NAND2_X1 U_out_{tgt.replace('[','_').replace(']','')} (.A({inputs_to_nand[0]}), .B({inputs_to_nand[1]}), .Y({out_wire}));")
-                elif k == 3:
-                    lines.append(f"  NAND3_X1 U_out_{tgt.replace('[','_').replace(']','')} (.A({inputs_to_nand[0]}), .B({inputs_to_nand[1]}), .C({inputs_to_nand[2]}), .Y({out_wire}));")
-                elif k == 4:
-                    lines.append(f"  NAND4_X1 U_out_{tgt.replace('[','_').replace(']','')} (.A({inputs_to_nand[0]}), .B({inputs_to_nand[1]}), .C({inputs_to_nand[2]}), .D({inputs_to_nand[3]}), .Y({out_wire}));")
-                else:
-                    lines.append(f"  NAND4_X1 U_out_{tgt.replace('[','_').replace(']','')} (.A({inputs_to_nand[0]}), .B({inputs_to_nand[1]}), .C({inputs_to_nand[2]}), .D({inputs_to_nand[3]}), .Y({out_wire}));")
+                lines.extend(emit_nand_or_tree(inputs_to_nand, out_wire, f"out_{clean_tgt}"))
             else:
                 c_idx = cube_map[str(expr)]
-                lines.append(f"  INV_X1   U_out_{tgt.replace('[','_').replace(']','')} (.A(w_c{c_idx}), .Y({out_wire}));")
+                lines.append(f"  INV_X1   U_out_{clean_tgt} (.A(w_c{c_idx}), .Y({out_wire}));")
 
         lines.append("")
         # Flip-Flops
         lines.append("  // 4. Sequential Register Bank")
-        lines.append("  DFFR_X1 U_dff_bgr   (.D(oc_ctrl_bgr_d), .CK(clk_i), .RN(res_n), .Q(oc_ctrl_bgr_q), .QN());")
+        lines.append("  DFFS_X1 U_dff_bgr   (.D(oc_ctrl_bgr_d), .CK(clk_i), .SN(res_n), .Q(oc_ctrl_bgr_q), .QN());")
         lines.append("  DFFR_X1 U_dff_cnt0  (.D(cnt_0_d),       .CK(clk_i), .RN(res_n), .Q(cnt_0_q),       .QN());")
         lines.append("  DFFR_X1 U_dff_cnt1  (.D(cnt_1_d),       .CK(clk_i), .RN(res_n), .Q(cnt_1_q),       .QN());")
         lines.append("  DFFR_X1 U_dff_cnt2  (.D(cnt_2_d),       .CK(clk_i), .RN(res_n), .Q(cnt_2_q),       .QN());")
         lines.append("  DFFR_X1 U_dff_cnt3  (.D(cnt_3_d),       .CK(clk_i), .RN(res_n), .Q(cnt_3_q),       .QN());")
-        lines.append("  DFFR_X1 U_dff_start (.D(startup_d),     .CK(clk_i), .RN(res_n), .Q(startup_q),     .QN());")
+        lines.append("  DFFS_X1 U_dff_start (.D(startup_d),     .CK(clk_i), .SN(res_n), .Q(startup_q),     .QN());")
         lines.append("")
         lines.append("  // Extended Output Aliases")
         lines.append("  assign oc_ctrl_bgr   = oc_ctrl_bgr_q;")

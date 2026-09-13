@@ -102,9 +102,19 @@ class UnifiedRTLExtractor:
                         else:
                             reg_widths[d.name] = 1
 
+        ordered_seq_targets = []
+        for item in module.items:
+            if isinstance(item, Decl):
+                for d in item.list:
+                    if isinstance(d, Reg) and d.name in seq_targets and d.name not in ordered_seq_targets:
+                        ordered_seq_targets.append(d.name)
+        for r in sorted(seq_targets):
+            if r not in ordered_seq_targets:
+                ordered_seq_targets.append(r)
+
         self.register_bits: List[str] = []
         self.reg_definitions: List[Tuple[str, int]] = []
-        for r in seq_targets:
+        for r in ordered_seq_targets:
             w = reg_widths.get(r, 1)
             self.reg_definitions.append((r, w))
             if w > 1:
@@ -236,7 +246,10 @@ class UnifiedRTLExtractor:
             raw_bits = list("".join(line[col] for line in lines))
 
             # Optional Don't-Care relaxation for startup states in stateful designs
-            if dc_relaxation == "startup_relaxed" and "startup" in self.inputs and any("cnt" in inp for inp in self.inputs):
+            # CRITICAL: Never relax next-state D-targets (self.d_targets), so state transitions
+            # (such as startup clearing at cnt==15 and steady-state counter/BGR next-states)
+            # are preserved with 100% formal accuracy.
+            if dc_relaxation == "startup_relaxed" and tgt not in self.d_targets and "startup" in self.inputs and any("cnt" in inp for inp in self.inputs):
                 startup_idx = self.inputs.index("startup")
                 cnt_indices = [idx for idx, inp in enumerate(self.inputs) if "cnt[" in inp]
                 for row_i in range(num_rows):

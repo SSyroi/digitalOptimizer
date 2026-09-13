@@ -131,11 +131,18 @@ class UnifiedVerilogAEmitter:
         lines.append("")
 
         # 5. Extract Unique Cubes & Build Map
-        var_names = [
-            "c_DfT_en_LP_in", "c_DfT_en_PWM_in", "c_DfT_oc_dig_VDD_1_in",
-            "c_DfT_oc_dig_VDD_0_in", "c_metalFix_invert_oc_defaults_in",
-            "oc_ctrl_bgr_q", "cnt_3_q", "cnt_2_q", "cnt_1_q", "cnt_0_q", "startup_q"
-        ]
+        var_names = []
+        for inp in self.input_names:
+            if inp in ("c_DfT_en_LP", "c_DfT_en_PWM", "c_metalFix_invert_oc_defaults"):
+                var_names.append(f"{inp}_in")
+            elif "c_DfT_oc_dig_VDD[" in inp:
+                bit = inp.split("[")[1].split("]")[0]
+                var_names.append(f"c_DfT_oc_dig_VDD_{bit}_in")
+            elif "cnt[" in inp:
+                bit = inp.split("[")[1].split("]")[0]
+                var_names.append(f"cnt_{bit}_q")
+            else:
+                var_names.append(f"{inp}_q")
 
         unique_cubes: List[Tuple[str, Any]] = []
         cube_map: Dict[str, int] = {}
