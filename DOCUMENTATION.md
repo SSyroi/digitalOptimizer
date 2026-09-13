@@ -147,7 +147,7 @@ Every synthesis algorithm is isolated in its own dedicated, self-documenting mod
 | Circuit | Description | Regs | Total Gates | Inverter Eq. (GE) | Est. Transistors | Key Gates Mapped |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
 | **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller (Strict) | 7 | **98 cells** | **347.0 GE** | **~694 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
-| **`PWM_CTRL_relaxed.v`** | Multi-mode PWM & Auto-Zero (Architectural Relaxations) | 7 | **77 cells** | **279.0 GE** | **~558 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
+| **`PWM_CTRL_relaxed.v`** | Multi-mode PWM & Auto-Zero (Corrected Constraints) | 7 | **88 cells** | **325.0 GE** | **~650 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
 | **`gray_counter.v`** | 3-bit binary to Gray-code generator | 3 | **5 cells** | **32.0 GE** | **~64 T** | `XOR2`, `DFFR` |
 | **`sar_adc_ctrl.v`** | 4-bit synchronous SAR ADC controller | 8 | **59 cells** | **197.0 GE** | **~394 T** | `MUX2`, `XOR2`, `NOR2`, `AND3`, `DFFR` |
 | **`bandgap_trim_fsm.v`**| Comparator-guided bandgap trimmer | 4 | **31 cells** | **104.0 GE** | **~208 T** | `MUX2`, `NOR2`, `DFFR` |
@@ -160,8 +160,8 @@ Every synthesis algorithm is isolated in its own dedicated, self-documenting mod
 | **Automation Deck Baseline** | 104 | 392.0 GE | 784 T | 0 | 16 | — | — | Baseline | Baseline | 100% PASS |
 | **AMS Optimizer: Strict RTL (`PWM_CTRL.v`)** | **98** | **347.0 GE** | **694 T** | **15** | 35 | 6 | 1 | **-45.0 GE (-11.5%)** | **-6 cells (-5.8%)** | **100% PASS** |
 | **AMS Optimizer: Strict RTL (No-MUX Area-Opt)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
-| **AMS Optimizer: Flexible Relaxed (`PWM_CTRL_relaxed.v`)** | **77** | **279.0 GE** | **558 T** | **7** | 28 | 6 | 1 | **-113.0 GE (-28.8%)** | **-27 cells (-26.0%)** | **100% PASS** |
-| **AMS Optimizer: Flexible Relaxed (No-MUX Area-Opt)** | **74** | **273.0 GE** | **546 T** | **0** | 30 | 6 | 1 | **-119.0 GE (-30.4%)** | **-30 cells (-28.8%)** | **100% PASS** |
+| **AMS Optimizer: Corrected Relaxed (`PWM_CTRL_relaxed.v`)** | **88** | **325.0 GE** | **650 T** | **15** | 34 | 6 | 1 | **-67.0 GE (-17.1%)** | **-16 cells (-15.4%)** | **100% PASS** |
+| **AMS Optimizer: Corrected Relaxed (No-MUX Area-Opt)** | **113** | **322.0 GE** | **644 T** | **0** | 32 | 6 | 1 | **-70.0 GE (-17.9%)** | +9 cells | **100% PASS** |
 
 ### 4.3 Verilog Creation Criteria & Nuances for AMS Synthesis
 

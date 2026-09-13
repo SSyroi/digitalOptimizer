@@ -57,8 +57,8 @@ A major real-world benchmark for AMS digital logic synthesis is `PWM_CTRL.v` (a 
 | **Automation Deck Baseline** | 104 | 392.0 GE | 784 T | 0 | 16 | — | — | Baseline | Baseline | 100% PASS |
 | **AMS Optimizer: Strict RTL (`PWM_CTRL.v`)** | **98** | **347.0 GE** | **694 T** | **15** | 35 | 6 | 1 | **-45.0 GE (-11.5%)** | **-6 cells (-5.8%)** | **100% PASS** |
 | **AMS Optimizer: Strict RTL (No-MUX Area-Opt)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
-| **AMS Optimizer: Flexible Relaxed (`PWM_CTRL_relaxed.v`)** | **77** | **279.0 GE** | **558 T** | **7** | 28 | 6 | 1 | **-113.0 GE (-28.8%)** | **-27 cells (-26.0%)** | **100% PASS** |
-| **AMS Optimizer: Flexible Relaxed (No-MUX Area-Opt)** | **74** | **273.0 GE** | **546 T** | **0** | 30 | 6 | 1 | **-119.0 GE (-30.4%)** | **-30 cells (-28.8%)** | **100% PASS** |
+| **AMS Optimizer: Corrected Relaxed (`PWM_CTRL_relaxed.v`)** | **88** | **325.0 GE** | **650 T** | **15** | 34 | 6 | 1 | **-67.0 GE (-17.1%)** | **-16 cells (-15.4%)** | **100% PASS** |
+| **AMS Optimizer: Corrected Relaxed (No-MUX Area-Opt)** | **113** | **322.0 GE** | **644 T** | **0** | 32 | 6 | 1 | **-70.0 GE (-17.9%)** | +9 cells | **100% PASS** |
 
 ---
 
@@ -197,11 +197,18 @@ $$\mathbf{4,096 \text{ vectors}} \times \mathbf{15 \text{ signals}} = \mathbf{61
 | `cnt[3:0]_d`, `startup_d`, `chopping_clk_d`, `pwm_chop_d` | Register Next-States (7) | 28,672 | 0 | **100% MATCH** |
 | **Total** | **All 15 Monitored Signals** | **61,440** | **0** | **100.0% IDENTICAL** |
 
-#### Relaxed Synthesis Results (Parameters = 1):
-When the 3 parameters are set to `1` (or using [`examples/PWM_CTRL_relaxed.v`](examples/PWM_CTRL_relaxed.v)):
-- Silicon area drops to **273.0 GE / 546 Transistors** (**-30.4% vs. Automation Deck**, **-16.0% vs. Strict RTL**).
-- Gate count drops to **74 cells** (**-30 cells vs. Automation Deck**, **-41 cells vs. Strict RTL**).
-- Fully passes formal LEC across all 4,096 state vectors.
+#### Physical Timing Verification & Architectural Nuances:
+In Cadence Virtuoso simulations, two critical physical constraints were verified:
+1. **Startup Auto-Zero Delay (BGR vs. CP)**: `oc_ctrl_bgr` drops to `0` at `cnt=1`, while `oc_ctrl_cp` must remain high through `cnt=1` and drop to `0` at `cnt=2` (exactly 1 cycle later than BGR).
+2. **PWM Early Control Wakeup**: Controls must rise at `cnt=15` (at least 1 cycle earlier than `en_LP` drops low at `cnt=0`) to ensure settling before active operation.
+3. **Virtuoso Pin Case Matching**: Pins use exact `c_DfT_*` casing (`c_DfT_en_LP`, `c_DfT_en_PWM`, `c_DfT_oc_dig_VDD`) to match Cadence schematic symbol terminals.
+
+#### Corrected Synthesis Results ([`examples/PWM_CTRL_relaxed.v`](examples/PWM_CTRL_relaxed.v)):
+With these verified physical constraints implemented:
+- **Minimum Silicon Area (Pure CMOS / cs019sw)**: **322.0 GE / 644 Transistors**, 113 cells (**-70.0 GE / -17.9% vs. Automation Deck**).
+- **Minimum Standard Cell Count (with MUX2)**: **325.0 GE / 650 Transistors**, **88 cells** (**-16 cells / -15.4% vs. Automation Deck**).
+- **Default Flow (with MUX2 & isolated buffers)**: **344.0 GE / 688 Transistors**, 96 cells.
+- Fully passes exhaustive Formal Logic Equivalence Checking (LEC) across all 4,096 state vectors and Stage 0–4 matrix verification.
 
 ---
 
