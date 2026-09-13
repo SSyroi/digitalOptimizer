@@ -24,7 +24,7 @@
   - **Quine-McCluskey with Don't-Cares ($X$)**: Minimal prime implicants for custom FSM transition cones.
 - **Automated FSM State Reachability**: Analyzes reachable state space from reset; marks unreachable states as Don't-Cares to maximize gate reduction.
 - **Full Cadence Deliverables & Intermediate Netlist**:
-  - **Cadence Spectre Verilog-A (`.va`)**: Continuous analog voltage contributions (`V(out) <+ transition(...)`), `@(initial_step)` reset, `@(cross(V(clk)-vth, +1))` clock sampling, and **detailed Inverter Equivalents (GE)** header notes.
+  - **Cadence Spectre Verilog-A (`.va`)**: **Supply-Aware architecture** with dynamic `V(VDD)` / `V(VSS)` output swing (operates at any supply without code edits), input boundary differential thresholding `((V(pin) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)`, pure 0/1 Boolean helper functions, `@(initial_step)` reset, `@(cross(V(clk)-vth, +1))` clock sampling, and detailed Inverter Equivalents (GE) header notes.
   - **Structural Gate Netlist (`.json`)**: Intermediate gate-level netlist capturing all standard cell instances, topological levels, and pin-to-pin connections for future schematic mapping.
   - **Cadence Virtuoso SKILL (`.il`)**: Automated schematic generator placing standard cells in dependency rank columns.
   - **Schematic Bill of Materials (BOM) Report (`.md` / `.txt`)**.
@@ -35,8 +35,8 @@
 
 | Circuit | Description | Regs | Total Gates | Inverter Eq. (GE) | Est. Transistors | Key Gates Mapped |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller (Strict) | 7 | **115 cells** | **325.0 GE** | **~650 T** | `AOI22`, `AOI21`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
-| **`PWM_CTRL_relaxed.v`** | Multi-mode PWM & Auto-Zero (Architectural Relaxations) | 7 | **74 cells** | **273.0 GE** | **~546 T** | `AOI22`, `AOI21`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
+| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller (Strict) | 7 | **98 cells** | **347.0 GE** | **~694 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
+| **`PWM_CTRL_relaxed.v`** | Multi-mode PWM & Auto-Zero (Architectural Relaxations) | 7 | **77 cells** | **279.0 GE** | **~558 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
 | **`gray_counter.v`** | 3-bit binary to Gray-code generator | 3 | **5 cells** | **32.0 GE** | **~64 T** | `XOR2`, `DFFR` |
 | **`sar_adc_ctrl.v`** | 4-bit synchronous SAR ADC controller | 8 | **59 cells** | **197.0 GE** | **~394 T** | `MUX2`, `XOR2`, `NOR2`, `AND3`, `DFFR` |
 | **`bandgap_trim_fsm.v`**| Comparator-guided bandgap trimmer | 4 | **31 cells** | **104.0 GE** | **~208 T** | `MUX2`, `NOR2`, `DFFR` |
@@ -55,11 +55,10 @@ A major real-world benchmark for AMS digital logic synthesis is `PWM_CTRL.v` (a 
 | Synthesis Solution | Total Cells | Area (GE) | Transistors | MUX2 | INV | AOI22 | AOI21 | Area Delta vs. Deck | Cell Delta vs. Deck | Formal LEC (4096 Vecs) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Automation Deck Baseline** | 104 | 392.0 GE | 784 T | 0 | 16 | — | — | Baseline | Baseline | 100% PASS |
-| **AMS Optimizer: Strict RTL (`PWM_CTRL.v`)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
-| **AMS Optimizer: Flexible Nominal (Defaults = 0)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
-| **AMS Optimizer: Flexible Relaxed (`PWM_CTRL_relaxed.v`)** | **74** | **273.0 GE** | **546 T** | **0** | 30 | 6 | 1 | **-119.0 GE (-30.4%)** | **-30 cells (-28.8%)** | **100% PASS** |
-| **AMS Optimizer: Pareto Balanced** | **90** | **328.0 GE** | **656 T** | **15** | 30 | 6 | 1 | **-64.0 GE (-16.3%)** | **-14 cells (-13.5%)** | **100% PASS** |
-| **AMS Optimizer: Minimum Cell Count** | **81** | **339.0 GE** | **678 T** | **12** | 23 | 6 | 1 | **-53.0 GE (-13.5%)** | **-23 cells (-22.1%)** | **100% PASS** |
+| **AMS Optimizer: Strict RTL (`PWM_CTRL.v`)** | **98** | **347.0 GE** | **694 T** | **15** | 35 | 6 | 1 | **-45.0 GE (-11.5%)** | **-6 cells (-5.8%)** | **100% PASS** |
+| **AMS Optimizer: Strict RTL (No-MUX Area-Opt)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
+| **AMS Optimizer: Flexible Relaxed (`PWM_CTRL_relaxed.v`)** | **77** | **279.0 GE** | **558 T** | **7** | 28 | 6 | 1 | **-113.0 GE (-28.8%)** | **-27 cells (-26.0%)** | **100% PASS** |
+| **AMS Optimizer: Flexible Relaxed (No-MUX Area-Opt)** | **74** | **273.0 GE** | **546 T** | **0** | 30 | 6 | 1 | **-119.0 GE (-30.4%)** | **-30 cells (-28.8%)** | **100% PASS** |
 
 ---
 
@@ -258,6 +257,14 @@ To ensure your Verilog RTL synthesizes smoothly without issues or unintended log
 - For signals directly controlling sensitive analog switches (capacitive DACs, charge pumps, auto-zero sampling), combinational decoders can produce transient switching glitches when multiple counter bits toggle simultaneously.
 - Adding output registers (`output reg sig` or `assign sig = sig_q;`) completely isolates timing and provides glitch-free analog control at the cost of **1 Flip-Flop per bit** (`17.0 GE` / `34 Transistors`).
 - The optimizer handles output registers natively: it instantiates the sequential flop in Column 0, connects its `Q` pin directly to the output port, and synthesizes the minimal combinational cone feeding its `D` input.
+
+### 7. Power and Ground Pins for Supply-Aware Verilog-A
+- Declare supply and ground pins in the module port list: `inout VDD, VSS;` (or `GND`, `SUB`, `AVDD`, `AVSS`, `DVDD`, `DVSS`).
+- The optimizer automatically detects these pins, excludes them from Boolean gate logic, and maps them as dynamic physical supply rails in the generated Verilog-A output drivers:
+  ```verilog
+  V(out) <+ transition((val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);
+  ```
+- Primary inputs are differentially referenced against `V(VDD,VSS)*0.5`, enabling multi-supply corner simulation (e.g. 890 mV, 1.2 V, 1.8 V, 3.3 V) without manual model edits.
 
 ---
 

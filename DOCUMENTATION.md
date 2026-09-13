@@ -118,13 +118,20 @@ Every synthesis algorithm is isolated in its own dedicated, self-documenting mod
 
 ### 3.8 Cadence Spectre Verilog-A Generation (`veriloga_emitter.py`)
 - **File:** [`ams_optimizer/core/veriloga_emitter.py`](file:///Users/ssyr/Git/digitalOptimizer/ams_optimizer/core/veriloga_emitter.py)
-- **Role:** Generates self-contained, 100% Cadence Spectre-compliant Verilog-A (`.va`) models.
+- **Role:** Generates self-contained, 100% Cadence Spectre-compliant, **Supply-Aware Verilog-A (`.va`)** models.
 - **Key Features:**
-  - Macro parameters: `vhigh`, `vlow`, `vth`, `tdel`, `trise`, `tfall`.
-  - Embedded analog helper functions for all mapped cells (`NAND2`, `NOR2`, `AOI21`, `MUX2`, `XOR2`).
-  - `@(initial_step)` static reset state initialization.
-  - `@(cross(V(clk) - vth, +1))` sequential clock sampling.
-  - Continuous transition voltage contributions (`V(out) <+ transition(...)`) for 100% of primary outputs.
+  - **Dynamic Supply Rails**: Output drivers swing dynamically between the physical `V(VDD)` and `V(VSS)` pins, eliminating hardcoded `vhigh`/`vlow` parameters:
+    ```verilog
+    V(en_LP) <+ transition((en_LP_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);
+    ```
+    This enables seamless multi-supply corner simulation (e.g. 890 mV, 1.2 V, 1.8 V, 3.3 V) without modifying the model.
+  - **Input Boundary Conversion**: Analog input pins are converted to logic at the boundary via differential supply thresholding:
+    ```verilog
+    ((V(pin) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)
+    ```
+  - **Pure 0.0 / 1.0 Gate Functions**: All embedded standard cell helpers (`INV`, `NAND2`, `NOR2`, `AOI21`, `MUX2`, etc.) operate on pure `0.0` / `1.0` logic levels with a clean midpoint threshold of `0.5`.
+  - **Configurable Edge Detection**: Parameter `vth` is retained exclusively for designer-configurable clock and reset edge detection in `@(cross(V(clk) - vth, +1))` and `@(cross(V(res_n) - vth, -1))`.
+  - **Full BOM & Complexity Header**: Embeds exact gate counts, Inverter Equivalents (GE), and estimated transistor counts.
 
 ### 3.9 Cadence Virtuoso SKILL Schematic Generation (`skill_emitter.py`)
 - **File:** [`ams_optimizer/core/skill_emitter.py`](file:///Users/ssyr/Git/digitalOptimizer/ams_optimizer/core/skill_emitter.py)
@@ -139,8 +146,8 @@ Every synthesis algorithm is isolated in its own dedicated, self-documenting mod
 
 | Circuit | Description | Regs | Total Gates | Inverter Eq. (GE) | Est. Transistors | Key Gates Mapped |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller (Strict) | 7 | **115 cells** | **325.0 GE** | **~650 T** | `AOI22`, `AOI21`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
-| **`PWM_CTRL_relaxed.v`** | Multi-mode PWM & Auto-Zero (Architectural Relaxations) | 7 | **74 cells** | **273.0 GE** | **~546 T** | `AOI22`, `AOI21`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
+| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller (Strict) | 7 | **98 cells** | **347.0 GE** | **~694 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
+| **`PWM_CTRL_relaxed.v`** | Multi-mode PWM & Auto-Zero (Architectural Relaxations) | 7 | **77 cells** | **279.0 GE** | **~558 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
 | **`gray_counter.v`** | 3-bit binary to Gray-code generator | 3 | **5 cells** | **32.0 GE** | **~64 T** | `XOR2`, `DFFR` |
 | **`sar_adc_ctrl.v`** | 4-bit synchronous SAR ADC controller | 8 | **59 cells** | **197.0 GE** | **~394 T** | `MUX2`, `XOR2`, `NOR2`, `AND3`, `DFFR` |
 | **`bandgap_trim_fsm.v`**| Comparator-guided bandgap trimmer | 4 | **31 cells** | **104.0 GE** | **~208 T** | `MUX2`, `NOR2`, `DFFR` |
@@ -151,18 +158,49 @@ Every synthesis algorithm is isolated in its own dedicated, self-documenting mod
 | Synthesis Solution | Total Cells | Area (GE) | Transistors | MUX2 | INV | AOI22 | AOI21 | Area Delta vs. Deck | Cell Delta vs. Deck | Formal LEC (4096 Vecs) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Automation Deck Baseline** | 104 | 392.0 GE | 784 T | 0 | 16 | — | — | Baseline | Baseline | 100% PASS |
-| **AMS Optimizer: Strict RTL (`PWM_CTRL.v`)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
-| **AMS Optimizer: Flexible Nominal (Defaults = 0)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
-| **AMS Optimizer: Flexible Relaxed (`PWM_CTRL_relaxed.v`)** | **74** | **273.0 GE** | **546 T** | **0** | 30 | 6 | 1 | **-119.0 GE (-30.4%)** | **-30 cells (-28.8%)** | **100% PASS** |
-| **AMS Optimizer: Pareto Balanced** | **90** | **328.0 GE** | **656 T** | **15** | 30 | 6 | 1 | **-64.0 GE (-16.3%)** | **-14 cells (-13.5%)** | **100% PASS** |
-| **AMS Optimizer: Minimum Cell Count** | **81** | **339.0 GE** | **678 T** | **12** | 23 | 6 | 1 | **-53.0 GE (-13.5%)** | **-23 cells (-22.1%)** | **100% PASS** |
+| **AMS Optimizer: Strict RTL (`PWM_CTRL.v`)** | **98** | **347.0 GE** | **694 T** | **15** | 35 | 6 | 1 | **-45.0 GE (-11.5%)** | **-6 cells (-5.8%)** | **100% PASS** |
+| **AMS Optimizer: Strict RTL (No-MUX Area-Opt)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
+| **AMS Optimizer: Flexible Relaxed (`PWM_CTRL_relaxed.v`)** | **77** | **279.0 GE** | **558 T** | **7** | 28 | 6 | 1 | **-113.0 GE (-28.8%)** | **-27 cells (-26.0%)** | **100% PASS** |
+| **AMS Optimizer: Flexible Relaxed (No-MUX Area-Opt)** | **74** | **273.0 GE** | **546 T** | **0** | 30 | 6 | 1 | **-119.0 GE (-30.4%)** | **-30 cells (-28.8%)** | **100% PASS** |
 
-### 4.3 Verilog Coding Guidelines for AMS Digital Synthesis
+### 4.3 Verilog Creation Criteria & Nuances for AMS Synthesis
 
-1. **Synchronous Reset Flip-Flops**: Use `always @(posedge clk or negedge res_n)` with non-blocking assignments (`<=`). Non-zero resets automatically synthesize to preset flops (`DFFS`).
-2. **Intermediate Net Decomposition**: Define shared terms as `wire` and assign via continuous `assign`. Slices are converted into multi-level DAG nodes that are shared across output cones.
-3. **Architectural Parameters**: Standard Verilog `parameter NAME = VALUE;` is supported. Use parameters with ternary expressions `? :` to define optional timing window relaxations.
-4. **Counter & Decoding Simplification**: Avoid arbitrary comparisons like `cnt == 15 || cnt == 0`. Single-cycle or power-of-2 boundaries (`cnt == 0` or `cnt[3]`) eliminate multi-input comparators and minimize gate counts.
+To achieve maximum optimization and prevent issues when synthesizing with the AMS Digital Optimizer, follow these design practices:
+
+1. **Power and Ground Pins**:
+   - Declare supply and ground pins in the port list (e.g. `inout VDD, VSS;` or `input VDD, VSS;`).
+   - Standard names recognized: `VDD`, `VSS`, `GND`, `SUB`, `AVDD`, `AVSS`, `DVDD`, `DVSS`.
+   - Supply pins are automatically excluded from logic functions and used as dynamic rails in the generated Verilog-A model (`V(VDD)` / `V(VSS)`).
+
+2. **Clock and Asynchronous Reset**:
+   - Use standard procedural blocks: `always @(posedge clk or negedge res_n)` (active-low) or `always @(posedge clk or posedge reset)` (active-high).
+   - Keep reset expressions direct (e.g. `if (!res_n)`). Avoid nested logic or complex conditions in the sensitivity list.
+   - Non-zero reset values (e.g. `startup <= 1'b1;`) automatically map to preset flops (`DFFS`). Zero resets map to cleared flops (`DFFR`).
+
+3. **Multi-Level DAG Intermediate Net Names**:
+   - Break complex combinational logic into meaningful intermediate `wire` definitions with `assign`:
+     ```verilog
+     wire is_az_mode = (eff_oc_mode == 2'b00);
+     wire is_pwm_active_window = (cnt == 0);
+     ```
+   - **Why this matters**: The optimizer uses named intermediate wires as natural DAG cut points. This keeps local truth tables small ($k \le 5$ inputs), enabling exact NPN matching and preventing exponential truth-table explosion.
+
+4. **Architectural Flexibility via Parameters**:
+   - When operational constraints permit flexibility (e.g., initial counter offset, mode encoding polarity, or startup timing), express them as parameters with ternary conditionals:
+     ```verilog
+     parameter RELAXED_STARTUP = 1;
+     wire startup_clear = RELAXED_STARTUP ? (cnt == 1) : (cnt == 15);
+     ```
+   - This allows sweeping and discovering the most gate-efficient implementation while keeping the exact same behavioral interface.
+
+5. **Counter Window Alignment**:
+   - Align pulse windows to single-bit checks (e.g. `cnt[3]`) or zero tests (`cnt == 0`), rather than compound multi-bit comparisons (`cnt == 15 || cnt == 0`).
+   - In `PWM_CTRL_relaxed.v`, simplifying the startup clear from `cnt == 15` (`cnt[0] & cnt[1] & cnt[2] & cnt[3]`) to `cnt == 1` (`cnt[0] & ~cnt[1] & ~cnt[2] & ~cnt[3]`) allowed sharing with `is_pwm_sample_window`, directly saving 4 gates.
+
+6. **Bit Slices and Bus Widths**:
+   - Define bus widths explicitly: `wire [1:0] eff_oc_mode;`
+   - Access bits with single-index notation: `eff_oc_mode[0]`, `eff_oc_mode[1]`.
+   - Avoid non-constant variable slicing (e.g. `bus[var]`).
 
 ---
 

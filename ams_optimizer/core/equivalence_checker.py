@@ -30,6 +30,8 @@ class StandardCellEvaluator:
     def eval_gate(cell: str, args: List[int]) -> int:
         if cell == "INV":
             return 1 - (args[0] if len(args) > 0 else 0)
+        elif cell in ("BUF", "BUFFER"):
+            return args[0] if len(args) > 0 else 0
         elif cell == "NAND2":
             return 0 if ((args[0] if len(args) > 0 else 0) and (args[1] if len(args) > 1 else 0)) else 1
         elif cell == "AND2":
@@ -104,6 +106,12 @@ class StandardCellEvaluator:
             inner = expr[2:-1]
             return lambda env: env.get(expr, env.get(inner, 0))
 
+        # Check for Verilog-A boundary condition: ((V(pin) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)
+        m_va = re.match(r"^\(\(V\(([A-Za-z0-9_\[\]]+)\)\s*>\s*.*?\?\s*1(?:\.0)?\s*:\s*0(?:\.0)?\)$", expr)
+        if m_va:
+            inner = m_va.group(1)
+            return lambda env: env.get(inner, env.get(f"V({inner})", 0))
+
         gate_match = re.match(r"^([A-Z0-9]+)\((.*)\)$", expr)
         if not gate_match:
             # Leaf identifier / net
@@ -125,6 +133,12 @@ class StandardCellEvaluator:
             return 1
         if expr.startswith("V(") and expr.endswith(")"):
             return env.get(expr, env.get(expr[2:-1], 0))
+
+        # Check for Verilog-A boundary condition: ((V(pin) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)
+        m_va = re.match(r"^\(\(V\(([A-Za-z0-9_\[\]]+)\)\s*>\s*.*?\?\s*1(?:\.0)?\s*:\s*0(?:\.0)?\)$", expr)
+        if m_va:
+            inner = m_va.group(1)
+            return env.get(inner, env.get(f"V({inner})", 0))
 
         gate_match = re.match(r"^([A-Z0-9]+)\((.*)\)$", expr)
         if not gate_match:

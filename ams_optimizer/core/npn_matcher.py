@@ -27,7 +27,6 @@ class NPNBitmaskMatcher:
         return None
 
     @staticmethod
-    @staticmethod
     def match_2input(tt: LocalTruthTable, allow_and_or: bool = True) -> Optional[MappedLogicNode]:
         """Matches 2-input NAND2, NOR2, AND2, OR2, XOR2, XNOR2."""
         a, b = tt.inputs[0], tt.inputs[1]

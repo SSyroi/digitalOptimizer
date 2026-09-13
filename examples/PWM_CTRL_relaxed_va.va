@@ -7,17 +7,19 @@
 // Cadence Spectre & Virtuoso Compatible Verilog-A Model
 //
 // Circuit Complexity & Silicon Area Notes:
-//   - Total Gate Count         : 89 cells
-//   - Inverter Equivalents (GE) : 273.0 inverters (1 GE = 1 Inverter = 2 Transistors)
-//   - Est. Transistor Count    : ~546 transistors
+//   - Total Gate Count         : 77 cells
+//   - Inverter Equivalents (GE) : 279.0 inverters (1 GE = 1 Inverter = 2 Transistors)
+//   - Est. Transistor Count    : ~558 transistors
 //
 // Standard Cell Breakdown (Gate Counts & Inverter Weights):
 //   - AOI21   :   1 cells (  3.0 inverters eq.,    6 transistors)
 //   - AOI22   :   6 cells ( 24.0 inverters eq.,   48 transistors)
+//   - BUFFER  :   3 cells (  6.0 inverters eq.,   12 transistors)
 //   - DFFR    :   6 cells (102.0 inverters eq.,  204 transistors)
 //   - DFFS    :   1 cells ( 17.0 inverters eq.,   34 transistors)
-//   - INV     :  30 cells ( 30.0 inverters eq.,   60 transistors)
-//   - NAND2   :  34 cells ( 68.0 inverters eq.,  136 transistors)
+//   - INV     :  28 cells ( 28.0 inverters eq.,   56 transistors)
+//   - MUX2    :   7 cells ( 42.0 inverters eq.,   84 transistors)
+//   - NAND2   :  14 cells ( 28.0 inverters eq.,   56 transistors)
 //   - NAND3   :   4 cells ( 12.0 inverters eq.,   24 transistors)
 //   - NAND4   :   1 cells (  4.0 inverters eq.,    8 transistors)
 //   - NOR2    :   5 cells ( 10.0 inverters eq.,   20 transistors)
@@ -61,112 +63,115 @@ module PWM_CTRL_va (VDD, VSS, sub, res_n, c_DFT_en_LP, c_DFT_en_PWM, c_DfT_oc_di
   electrical c_metalFix_invert_oc_defaults;
 
   // Electrical Parameters
-  parameter real vhigh = 1.800;
-  parameter real vlow  = 0.000;
+  // NOTE: Internal logic operates on abstract 0.0 / 1.0 levels.
+  // Output voltages are driven by the physical V(VDD) and V(VSS) pins.
+  // vth is used ONLY for clock and reset @(cross) edge detection.
   parameter real vth   = 0.900;
   parameter real tdel  = 30p;
   parameter real trise = 30p;
   parameter real tfall = 30p;
 
-  // Analog Standard Cell Helper Functions
+  // Analog Standard Cell Helper Functions (Pure 0/1 Boolean Logic)
+  // Threshold = 0.5 (midpoint of internal 0.0/1.0 domain)
+  // Voltage conversion to V(VDD)/V(VSS) happens at I/O boundary only.
   analog function real INV;
     input a; real a;
-    INV = !(a > 0.900) ? 1.800 : 0.000;
+    INV = !(a > 0.5) ? 1.0 : 0.0;
   endfunction
 
   analog function real NAND2;
     input a, b; real a, b;
-    NAND2 = !((a > 0.900) && (b > 0.900)) ? 1.800 : 0.000;
+    NAND2 = !((a > 0.5) && (b > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real AND2;
     input a, b; real a, b;
-    AND2 = ((a > 0.900) && (b > 0.900)) ? 1.800 : 0.000;
+    AND2 = ((a > 0.5) && (b > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real NOR2;
     input a, b; real a, b;
-    NOR2 = !((a > 0.900) || (b > 0.900)) ? 1.800 : 0.000;
+    NOR2 = !((a > 0.5) || (b > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real OR2;
     input a, b; real a, b;
-    OR2 = ((a > 0.900) || (b > 0.900)) ? 1.800 : 0.000;
+    OR2 = ((a > 0.5) || (b > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real XOR2;
     input a, b; real a, b;
-    XOR2 = ((a > 0.900) != (b > 0.900)) ? 1.800 : 0.000;
+    XOR2 = ((a > 0.5) != (b > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real XNOR2;
     input a, b; real a, b;
-    XNOR2 = ((a > 0.900) == (b > 0.900)) ? 1.800 : 0.000;
+    XNOR2 = ((a > 0.5) == (b > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real MUX2;
     input s, d0, d1; real s, d0, d1;
-    MUX2 = (s > 0.900) ? d1 : d0;
+    MUX2 = (s > 0.5) ? d1 : d0;
   endfunction
 
   analog function real AOI21;
     input a, b, c; real a, b, c;
-    AOI21 = !(((a > 0.900) && (b > 0.900)) || (c > 0.900)) ? 1.800 : 0.000;
+    AOI21 = !(((a > 0.5) && (b > 0.5)) || (c > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real OAI21;
     input a, b, c; real a, b, c;
-    OAI21 = !(((a > 0.900) || (b > 0.900)) && (c > 0.900)) ? 1.800 : 0.000;
+    OAI21 = !(((a > 0.5) || (b > 0.5)) && (c > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real NAND3;
     input a, b, c; real a, b, c;
-    NAND3 = !((a > 0.900) && (b > 0.900) && (c > 0.900)) ? 1.800 : 0.000;
+    NAND3 = !((a > 0.5) && (b > 0.5) && (c > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real AND3;
     input a, b, c; real a, b, c;
-    AND3 = ((a > 0.900) && (b > 0.900) && (c > 0.900)) ? 1.800 : 0.000;
+    AND3 = ((a > 0.5) && (b > 0.5) && (c > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real NOR3;
     input a, b, c; real a, b, c;
-    NOR3 = !((a > 0.900) || (b > 0.900) || (c > 0.900)) ? 1.800 : 0.000;
+    NOR3 = !((a > 0.5) || (b > 0.5) || (c > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real OR3;
     input a, b, c; real a, b, c;
-    OR3 = ((a > 0.900) || (b > 0.900) || (c > 0.900)) ? 1.800 : 0.000;
+    OR3 = ((a > 0.5) || (b > 0.5) || (c > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real NAND4;
     input a, b, c, d; real a, b, c, d;
-    NAND4 = !((a > 0.900) && (b > 0.900) && (c > 0.900) && (d > 0.900)) ? 1.800 : 0.000;
+    NAND4 = !((a > 0.5) && (b > 0.5) && (c > 0.5) && (d > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real AND4;
     input a, b, c, d; real a, b, c, d;
-    AND4 = ((a > 0.900) && (b > 0.900) && (c > 0.900) && (d > 0.900)) ? 1.800 : 0.000;
+    AND4 = ((a > 0.5) && (b > 0.5) && (c > 0.5) && (d > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real NOR4;
     input a, b, c, d; real a, b, c, d;
-    NOR4 = !((a > 0.900) || (b > 0.900) || (c > 0.900) || (d > 0.900)) ? 1.800 : 0.000;
+    NOR4 = !((a > 0.5) || (b > 0.5) || (c > 0.5) || (d > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real OR4;
     input a, b, c, d; real a, b, c, d;
-    OR4 = ((a > 0.900) || (b > 0.900) || (c > 0.900) || (d > 0.900)) ? 1.800 : 0.000;
+    OR4 = ((a > 0.5) || (b > 0.5) || (c > 0.5) || (d > 0.5)) ? 1.0 : 0.0;
   endfunction
 
   analog function real AOI22;
     input a, b, c, d; real a, b, c, d;
-    AOI22 = !(((a > 0.900) && (b > 0.900)) || ((c > 0.900) && (d > 0.900))) ? 1.800 : 0.000;
+    AOI22 = !(((a > 0.5) && (b > 0.5)) || ((c > 0.5) && (d > 0.5))) ? 1.0 : 0.0;
   endfunction
 
   analog function real OAI22;
     input a, b, c, d; real a, b, c, d;
-    OAI22 = !(((a > 0.900) || (b > 0.900)) && ((c > 0.900) || (d > 0.900))) ? 1.800 : 0.000;
+    OAI22 = !(((a > 0.5) || (b > 0.5)) && ((c > 0.5) || (d > 0.5))) ? 1.0 : 0.0;
   endfunction
 
   // Internal State & Combinational Signals
@@ -188,80 +193,80 @@ module PWM_CTRL_va (VDD, VSS, sub, res_n, c_DFT_en_LP, c_DFT_en_PWM, c_DfT_oc_di
   real oc_select_ext_val;
   real oc_ctrl_cp_ext_val;
   real en_LP_ext_val;
-  real oc_select_val;
   real en_LP_val;
+  real oc_select_val;
   real oc_ctrl_bgr_val;
   real en_lowFreq_val;
   real oc_ctrl_cp_val;
 
   analog begin
     @(initial_step) begin
-      cnt_0_q = vlow;
-      cnt_1_q = vlow;
-      cnt_2_q = vlow;
-      cnt_3_q = vlow;
-      startup_q = vhigh;
-      chopping_clk_q = vlow;
-      pwm_chop_q = vlow;
+      cnt_0_q = 0.0;
+      cnt_1_q = 0.0;
+      cnt_2_q = 0.0;
+      cnt_3_q = 0.0;
+      startup_q = 1.0;
+      chopping_clk_q = 0.0;
+      pwm_chop_q = 0.0;
     end
 
     // Asynchronous Reset Event: res_n falling edge (active low)
     @(cross(V(res_n) - vth, -1)) begin
-      cnt_0_q = vlow;
-      cnt_1_q = vlow;
-      cnt_2_q = vlow;
-      cnt_3_q = vlow;
-      startup_q = vhigh;
-      chopping_clk_q = vlow;
-      pwm_chop_q = vlow;
+      cnt_0_q = 0.0;
+      cnt_1_q = 0.0;
+      cnt_2_q = 0.0;
+      cnt_3_q = 0.0;
+      startup_q = 1.0;
+      chopping_clk_q = 0.0;
+      pwm_chop_q = 0.0;
     end
 
     // Sequential Register Bank Clock Edge Sampling
     @(cross(V(clk_i) - vth, +1)) begin
       if (V(res_n) > vth) begin
-        cnt_0_q = (cnt_0_d > vth) ? vhigh : vlow;
-        cnt_1_q = (cnt_1_d > vth) ? vhigh : vlow;
-        cnt_2_q = (cnt_2_d > vth) ? vhigh : vlow;
-        cnt_3_q = (cnt_3_d > vth) ? vhigh : vlow;
-        startup_q = (startup_d > vth) ? vhigh : vlow;
-        chopping_clk_q = (chopping_clk_d > vth) ? vhigh : vlow;
-        pwm_chop_q = (pwm_chop_d > vth) ? vhigh : vlow;
+        cnt_0_q = (cnt_0_d > 0.5) ? 1.0 : 0.0;
+        cnt_1_q = (cnt_1_d > 0.5) ? 1.0 : 0.0;
+        cnt_2_q = (cnt_2_d > 0.5) ? 1.0 : 0.0;
+        cnt_3_q = (cnt_3_d > 0.5) ? 1.0 : 0.0;
+        startup_q = (startup_d > 0.5) ? 1.0 : 0.0;
+        chopping_clk_q = (chopping_clk_d > 0.5) ? 1.0 : 0.0;
+        pwm_chop_q = (pwm_chop_d > 0.5) ? 1.0 : 0.0;
       end
     end
 
     // Multi-Level Combinational Logic Evaluations
     cnt_0_d = INV(cnt_0_q);
-    cnt_1_d = AOI22(cnt_0_q, cnt_1_q, INV(cnt_0_q), INV(cnt_1_q));
-    cnt_2_d = NAND2(NAND2(INV(NAND2(cnt_0_q, cnt_1_q)), INV(cnt_2_q)), NAND2(NAND2(cnt_0_q, cnt_1_q), cnt_2_q));
-    cnt_3_d = NAND2(NAND2(INV(NAND3(cnt_0_q, cnt_1_q, cnt_2_q)), INV(cnt_3_q)), NAND2(NAND3(cnt_0_q, cnt_1_q, cnt_2_q), cnt_3_q));
+    cnt_1_d = AOI22(INV(cnt_0_q), INV(cnt_1_q), cnt_0_q, cnt_1_q);
+    cnt_2_d = MUX2(cnt_2_q, INV(NAND2(cnt_0_q, cnt_1_q)), NAND2(cnt_0_q, cnt_1_q));
+    cnt_3_d = MUX2(cnt_3_q, INV(NAND3(cnt_0_q, cnt_1_q, cnt_2_q)), NAND3(cnt_0_q, cnt_1_q, cnt_2_q));
     startup_d = INV(NAND2(startup_q, NAND2(cnt_0_q, NOR3(cnt_1_q, cnt_2_q, cnt_3_q))));
     chopping_clk_d = INV(chopping_clk_q);
-    pwm_chop_d = NAND2(NAND2(NOR2(cnt_0_q, INV(NOR3(cnt_1_q, cnt_2_q, cnt_3_q))), INV(pwm_chop_q)), NAND2(NAND2(INV(cnt_0_q), NOR3(cnt_1_q, cnt_2_q, cnt_3_q)), pwm_chop_q));
-    eff_oc_mode_0_val = AOI22(V(c_DfT_oc_dig_VDD[0]), V(c_metalFix_invert_oc_defaults), INV(V(c_DfT_oc_dig_VDD[0])), INV(V(c_metalFix_invert_oc_defaults)));
-    eff_oc_mode_1_val = AOI22(V(c_DfT_oc_dig_VDD[1]), V(c_metalFix_invert_oc_defaults), INV(V(c_DfT_oc_dig_VDD[1])), INV(V(c_metalFix_invert_oc_defaults)));
+    pwm_chop_d = MUX2(pwm_chop_q, NOR2(cnt_0_q, INV(NOR3(cnt_1_q, cnt_2_q, cnt_3_q))), NAND2(INV(cnt_0_q), NOR3(cnt_1_q, cnt_2_q, cnt_3_q)));
+    eff_oc_mode_0_val = AOI22(INV(((V(c_DfT_oc_dig_VDD[0]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)), INV(((V(c_metalFix_invert_oc_defaults) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)), ((V(c_DfT_oc_dig_VDD[0]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), ((V(c_metalFix_invert_oc_defaults) > V(VDD,VSS)*0.5) ? 1.0 : 0.0));
+    eff_oc_mode_1_val = AOI22(INV(((V(c_DfT_oc_dig_VDD[1]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)), INV(((V(c_metalFix_invert_oc_defaults) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)), ((V(c_DfT_oc_dig_VDD[1]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), ((V(c_metalFix_invert_oc_defaults) > V(VDD,VSS)*0.5) ? 1.0 : 0.0));
     is_az_mode_val = NOR2(eff_oc_mode_0_val, eff_oc_mode_1_val);
     is_static_0_val = INV(NAND2(eff_oc_mode_0_val, INV(eff_oc_mode_1_val)));
     is_static_1_val = eff_oc_mode_0_val;
     is_chop_mode_val = INV(NAND2(eff_oc_mode_0_val, eff_oc_mode_1_val));
     is_pwm_active_window_val = NOR3(cnt_1_q, cnt_2_q, cnt_3_q);
     is_pwm_sample_window_val = NOR2(cnt_0_q, INV(NOR3(cnt_1_q, cnt_2_q, cnt_3_q)));
-    oc_select_val = INV(AOI22(INV(V(c_DFT_en_LP)), is_chop_mode_val, INV(V(c_DFT_en_LP)), is_az_mode_val));
+    oc_select_val = INV(AOI22(INV(((V(c_DFT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)), is_chop_mode_val, INV(((V(c_DFT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)), is_az_mode_val));
     oc_select_ext_val = oc_select_val;
-    oc_ctrl_cp_val = NOR2(V(c_DFT_en_LP), NAND2(NAND2(NAND3(NAND4(INV(cnt_0_q), is_az_mode_val, INV(is_chop_mode_val), INV(startup_q)), NAND2(chopping_clk_q, is_chop_mode_val), NAND3(INV(is_az_mode_val), INV(is_chop_mode_val), INV(is_static_1_val))), INV(V(c_DFT_en_PWM))), NAND2(NAND2(NAND2(INV(AOI22(is_chop_mode_val, pwm_chop_q, INV(is_chop_mode_val), INV(is_static_1_val))), INV(is_az_mode_val)), NAND2(INV(is_pwm_sample_window_val), is_az_mode_val)), V(c_DFT_en_PWM))));
+    oc_ctrl_cp_val = NOR2(((V(c_DFT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), MUX2(((V(c_DFT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), NAND3(NAND4(INV(cnt_0_q), is_az_mode_val, INV(is_chop_mode_val), INV(startup_q)), NAND3(INV(is_az_mode_val), INV(is_chop_mode_val), INV(is_static_1_val)), NAND2(chopping_clk_q, is_chop_mode_val)), MUX2(is_az_mode_val, INV(AOI22(INV(is_chop_mode_val), INV(is_static_1_val), is_chop_mode_val, pwm_chop_q)), INV(is_pwm_sample_window_val))));
     oc_ctrl_cp_ext_val = oc_ctrl_cp_val;
-    en_LP_val = INV(AOI21(V(c_DFT_en_PWM), INV(is_pwm_active_window_val), V(c_DFT_en_LP)));
+    en_LP_val = INV(AOI21(((V(c_DFT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), INV(is_pwm_active_window_val), ((V(c_DFT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)));
     en_LP_ext_val = en_LP_val;
-    oc_ctrl_bgr_val = NOR2(V(c_DFT_en_LP), NAND2(NAND2(NAND3(NAND4(INV(cnt_0_q), is_az_mode_val, INV(is_chop_mode_val), INV(startup_q)), NAND2(INV(chopping_clk_q), is_chop_mode_val), NAND3(INV(is_az_mode_val), INV(is_chop_mode_val), INV(is_static_1_val))), INV(V(c_DFT_en_PWM))), NAND2(NAND2(NAND2(INV(AOI22(is_chop_mode_val, INV(pwm_chop_q), INV(is_chop_mode_val), INV(is_static_1_val))), INV(is_az_mode_val)), NAND2(INV(is_pwm_sample_window_val), is_az_mode_val)), V(c_DFT_en_PWM))));
-    en_lowFreq_val = NOR2(V(c_DFT_en_LP), INV(NAND2(NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(V(c_DFT_en_PWM)), INV(cnt_0_q))), is_az_mode_val)), INV(is_chop_mode_val))), INV(startup_q)), NAND2(V(c_DFT_en_PWM), INV(is_pwm_active_window_val)))));
+    oc_ctrl_bgr_val = NOR2(((V(c_DFT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), MUX2(((V(c_DFT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), NAND3(NAND4(INV(cnt_0_q), is_az_mode_val, INV(is_chop_mode_val), INV(startup_q)), NAND2(INV(chopping_clk_q), is_chop_mode_val), NAND3(INV(is_az_mode_val), INV(is_chop_mode_val), INV(is_static_1_val))), MUX2(is_az_mode_val, INV(AOI22(INV(is_chop_mode_val), INV(is_static_1_val), is_chop_mode_val, INV(pwm_chop_q))), INV(is_pwm_sample_window_val))));
+    en_lowFreq_val = NOR2(((V(c_DFT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), INV(NAND2(NAND2(((V(c_DFT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), INV(is_pwm_active_window_val)), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(((V(c_DFT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)), INV(cnt_0_q))), is_az_mode_val)), INV(is_chop_mode_val))), INV(startup_q)))));
 
     // Analog Electrical Output Drivers
-    V(en_LP) <+ transition((en_LP_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(oc_select) <+ transition((oc_select_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(oc_ctrl_cp) <+ transition((oc_ctrl_cp_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(oc_ctrl_bgr) <+ transition((oc_ctrl_bgr_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(en_lowFreq) <+ transition((en_lowFreq_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(oc_select_ext) <+ transition((oc_select_ext_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(oc_ctrl_cp_ext) <+ transition((oc_ctrl_cp_ext_val > vth) ? vhigh : vlow, tdel, trise, tfall);
-    V(en_LP_ext) <+ transition((en_LP_ext_val > vth) ? vhigh : vlow, tdel, trise, tfall);
+    V(en_LP) <+ transition((en_LP_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);
+    V(oc_select) <+ transition((oc_select_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);
+    V(oc_ctrl_cp) <+ transition((oc_ctrl_cp_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);
+    V(oc_ctrl_bgr) <+ transition((oc_ctrl_bgr_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);
+    V(en_lowFreq) <+ transition((en_lowFreq_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);
+    V(oc_select_ext) <+ transition((oc_select_ext_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);
+    V(oc_ctrl_cp_ext) <+ transition((oc_ctrl_cp_ext_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);
+    V(en_LP_ext) <+ transition((en_LP_ext_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);
   end
 endmodule
