@@ -207,8 +207,11 @@ class StageByStageVerifier:
             # -------------------------------------------------------------
             env_va = {"vhigh": 1, "vlow": 0}
             for p in self.dag.primary_inputs:
-                env_va[f"V({p})"] = stimulus.get(p, 0)
-                env_va[p] = stimulus.get(p, 0)
+                in_var = p.replace("[", "_").replace("]", "") + "_in"
+                val = stimulus.get(p, 0)
+                env_va[f"V({p})"] = val
+                env_va[p] = val
+                env_va[in_var] = val
             for r_name, r in self.dag.registers.items():
                 for bit_i in range(r.width):
                     b_key = f"{r_name}[{bit_i}]" if r.width > 1 else r_name

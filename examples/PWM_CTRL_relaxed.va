@@ -180,6 +180,12 @@ module PWM_CTRL (VDD, VSS, sub, res_n, c_DfT_en_LP, c_DfT_en_PWM, c_DfT_oc_dig_V
   real startup_q, startup_d;
   real chopping_clk_q, chopping_clk_d;
   real pwm_chop_q, pwm_chop_d;
+  // Boundary Input Logic Variables
+  real c_DfT_en_LP_in;
+  real c_DfT_en_PWM_in;
+  real c_DfT_oc_dig_VDD_1_in;
+  real c_DfT_oc_dig_VDD_0_in;
+  real c_metalFix_invert_oc_defaults_in;
   real eff_oc_mode_0_val;
   real eff_oc_mode_1_val;
   real is_az_mode_val;
@@ -191,11 +197,11 @@ module PWM_CTRL (VDD, VSS, sub, res_n, c_DfT_en_LP, c_DfT_en_PWM, c_DfT_oc_dig_V
   real oc_select_ext_val;
   real oc_ctrl_cp_ext_val;
   real en_LP_ext_val;
-  real oc_select_val;
-  real en_LP_val;
   real oc_ctrl_bgr_val;
-  real oc_ctrl_cp_val;
+  real en_LP_val;
+  real oc_select_val;
   real en_lowFreq_val;
+  real oc_ctrl_cp_val;
 
   analog begin
     @(initial_step) begin
@@ -232,30 +238,37 @@ module PWM_CTRL (VDD, VSS, sub, res_n, c_DfT_en_LP, c_DfT_en_PWM, c_DfT_oc_dig_V
       end
     end
 
+    // Boundary Input Logic Conversions (Sampled Once at I/O Boundary)
+    c_DfT_en_LP_in = ((V(c_DfT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0);
+    c_DfT_en_PWM_in = ((V(c_DfT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0);
+    c_DfT_oc_dig_VDD_1_in = ((V(c_DfT_oc_dig_VDD[1]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0);
+    c_DfT_oc_dig_VDD_0_in = ((V(c_DfT_oc_dig_VDD[0]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0);
+    c_metalFix_invert_oc_defaults_in = ((V(c_metalFix_invert_oc_defaults) > V(VDD,VSS)*0.5) ? 1.0 : 0.0);
+
     // Multi-Level Combinational Logic Evaluations
     cnt_0_d = INV(cnt_0_q);
     cnt_1_d = AOI22(cnt_0_q, cnt_1_q, INV(cnt_0_q), INV(cnt_1_q));
     cnt_2_d = NAND2(NAND2(INV(NAND2(cnt_0_q, cnt_1_q)), INV(cnt_2_q)), NAND2(NAND2(cnt_0_q, cnt_1_q), cnt_2_q));
     cnt_3_d = NAND2(NAND2(INV(NAND3(cnt_0_q, cnt_1_q, cnt_2_q)), INV(cnt_3_q)), NAND2(NAND3(cnt_0_q, cnt_1_q, cnt_2_q), cnt_3_q));
-    startup_d = INV(NAND2(startup_q, NAND4(cnt_0_q, cnt_1_q, cnt_2_q, cnt_3_q)));
+    startup_d = INV(NAND2(startup_q, NAND4(cnt_1_q, cnt_0_q, cnt_2_q, cnt_3_q)));
     chopping_clk_d = INV(chopping_clk_q);
     pwm_chop_d = NAND2(NAND2(NOR2(cnt_0_q, INV(NOR3(cnt_1_q, cnt_2_q, cnt_3_q))), INV(pwm_chop_q)), NAND2(NAND2(INV(cnt_0_q), NOR3(cnt_1_q, cnt_2_q, cnt_3_q)), pwm_chop_q));
-    eff_oc_mode_0_val = AOI22(((V(c_DfT_oc_dig_VDD[0]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), ((V(c_metalFix_invert_oc_defaults) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), INV(((V(c_DfT_oc_dig_VDD[0]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)), INV(((V(c_metalFix_invert_oc_defaults) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)));
-    eff_oc_mode_1_val = AOI22(((V(c_DfT_oc_dig_VDD[1]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), ((V(c_metalFix_invert_oc_defaults) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), INV(((V(c_DfT_oc_dig_VDD[1]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)), INV(((V(c_metalFix_invert_oc_defaults) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)));
+    eff_oc_mode_0_val = AOI22(c_DfT_oc_dig_VDD_0_in, c_metalFix_invert_oc_defaults_in, INV(c_DfT_oc_dig_VDD_0_in), INV(c_metalFix_invert_oc_defaults_in));
+    eff_oc_mode_1_val = AOI22(c_DfT_oc_dig_VDD_1_in, c_metalFix_invert_oc_defaults_in, INV(c_DfT_oc_dig_VDD_1_in), INV(c_metalFix_invert_oc_defaults_in));
     is_az_mode_val = NOR2(eff_oc_mode_0_val, eff_oc_mode_1_val);
     is_static_0_val = INV(NAND2(eff_oc_mode_0_val, INV(eff_oc_mode_1_val)));
     is_static_1_val = eff_oc_mode_0_val;
     is_chop_mode_val = INV(NAND2(eff_oc_mode_0_val, eff_oc_mode_1_val));
     is_pwm_active_window_val = NOR3(cnt_1_q, cnt_2_q, cnt_3_q);
     is_pwm_sample_window_val = NAND2(NAND2(NOR3(cnt_1_q, cnt_2_q, cnt_3_q), INV(cnt_0_q)), NAND2(INV(NAND3(cnt_1_q, cnt_2_q, cnt_3_q)), cnt_0_q));
-    oc_select_val = INV(AOI22(INV(((V(c_DfT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)), is_chop_mode_val, INV(((V(c_DfT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)), is_az_mode_val));
+    oc_select_val = INV(AOI22(INV(c_DfT_en_LP_in), is_az_mode_val, INV(c_DfT_en_LP_in), is_chop_mode_val));
     oc_select_ext_val = oc_select_val;
-    oc_ctrl_cp_val = NOR2(((V(c_DfT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), NAND2(NAND2(NAND2(NAND2(NOR2(is_chop_mode_val, NAND3(NAND2(cnt_0_q, is_az_mode_val), NAND2(INV(is_az_mode_val), is_static_1_val), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q))), INV(chopping_clk_q)), NAND2(NAND2(INV(is_chop_mode_val), NAND3(NAND2(cnt_0_q, is_az_mode_val), NAND2(INV(is_az_mode_val), is_static_1_val), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q))), chopping_clk_q)), INV(((V(c_DfT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0))), NAND2(NAND2(NAND2(INV(AOI22(is_chop_mode_val, pwm_chop_q, INV(is_chop_mode_val), INV(is_static_1_val))), INV(is_az_mode_val)), NAND2(INV(is_pwm_sample_window_val), is_az_mode_val)), ((V(c_DfT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0))));
+    oc_ctrl_cp_val = NOR2(c_DfT_en_LP_in, NAND2(NAND2(NAND2(NAND2(NOR2(is_chop_mode_val, NAND3(NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q), NAND2(cnt_0_q, is_az_mode_val), NAND2(INV(is_az_mode_val), is_static_1_val))), INV(chopping_clk_q)), NAND2(NAND2(INV(is_chop_mode_val), NAND3(NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q), NAND2(cnt_0_q, is_az_mode_val), NAND2(INV(is_az_mode_val), is_static_1_val))), chopping_clk_q)), INV(c_DfT_en_PWM_in)), NAND2(NAND2(NAND2(INV(AOI22(INV(is_chop_mode_val), INV(is_static_1_val), is_chop_mode_val, pwm_chop_q)), INV(is_az_mode_val)), NAND2(INV(is_pwm_sample_window_val), is_az_mode_val)), c_DfT_en_PWM_in)));
     oc_ctrl_cp_ext_val = oc_ctrl_cp_val;
-    en_LP_val = INV(AOI21(((V(c_DfT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), INV(is_pwm_active_window_val), ((V(c_DfT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)));
+    en_LP_val = INV(AOI21(c_DfT_en_PWM_in, INV(is_pwm_active_window_val), c_DfT_en_LP_in));
     en_LP_ext_val = en_LP_val;
-    oc_ctrl_bgr_val = NOR2(((V(c_DfT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), NAND2(NAND2(NAND2(NAND2(INV(NOR2(is_chop_mode_val, NAND2(NAND2(INV(NAND2(NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q), NAND2(INV(is_az_mode_val), is_static_1_val))), INV(cnt_0_q)), NAND2(NAND2(NAND2(INV(is_az_mode_val), INV(is_static_1_val)), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q)), cnt_0_q)))), INV(chopping_clk_q)), NAND2(NOR2(is_chop_mode_val, NAND2(NAND2(NAND2(NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q), NAND2(INV(is_az_mode_val), is_static_1_val)), INV(cnt_0_q)), NAND2(INV(NAND2(NAND2(INV(is_az_mode_val), INV(is_static_1_val)), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q))), cnt_0_q))), chopping_clk_q)), INV(((V(c_DfT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0))), NAND2(NAND2(NAND2(INV(AOI22(INV(is_chop_mode_val), INV(is_static_1_val), is_chop_mode_val, INV(pwm_chop_q))), INV(is_az_mode_val)), NAND2(INV(is_pwm_sample_window_val), is_az_mode_val)), ((V(c_DfT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0))));
-    en_lowFreq_val = NOR2(((V(c_DfT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0), NAND2(NAND2(NAND4(is_az_mode_val, NAND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q), INV(cnt_0_q), INV(is_chop_mode_val)), INV(((V(c_DfT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0))), NAND2(is_pwm_active_window_val, ((V(c_DfT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0))));
+    oc_ctrl_bgr_val = NOR2(c_DfT_en_LP_in, NAND2(NAND2(NAND2(NAND2(INV(NOR2(is_chop_mode_val, NAND2(NAND2(INV(NAND2(NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q), NAND2(INV(is_az_mode_val), is_static_1_val))), INV(cnt_0_q)), NAND2(NAND2(NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q), NAND2(INV(is_az_mode_val), INV(is_static_1_val))), cnt_0_q)))), INV(chopping_clk_q)), NAND2(NOR2(is_chop_mode_val, NAND2(NAND2(NAND2(NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q), NAND2(INV(is_az_mode_val), is_static_1_val)), INV(cnt_0_q)), NAND2(INV(NAND2(NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt_1_q), INV(cnt_2_q))), INV(cnt_3_q))), is_az_mode_val)), startup_q), NAND2(INV(is_az_mode_val), INV(is_static_1_val)))), cnt_0_q))), chopping_clk_q)), INV(c_DfT_en_PWM_in)), NAND2(NAND2(NAND2(INV(AOI22(is_chop_mode_val, INV(pwm_chop_q), INV(is_chop_mode_val), INV(is_static_1_val))), INV(is_az_mode_val)), NAND2(INV(is_pwm_sample_window_val), is_az_mode_val)), c_DfT_en_PWM_in)));
+    en_lowFreq_val = NOR2(c_DfT_en_LP_in, NAND2(NAND2(NAND4(INV(cnt_0_q), is_az_mode_val, INV(is_chop_mode_val), NAND4(INV(cnt_1_q), INV(cnt_2_q), INV(cnt_3_q), startup_q)), INV(c_DfT_en_PWM_in)), NAND2(is_pwm_active_window_val, c_DfT_en_PWM_in)));
 
     // Analog Electrical Output Drivers
     V(en_LP) <+ transition((en_LP_val > 0.5) ? V(VDD) : V(VSS), tdel, trise, tfall);

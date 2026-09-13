@@ -108,6 +108,24 @@ class VerilogAEmitter:
                 b_var = f"{r_name}_{bit_i}" if r.width > 1 else r_name
                 lines.append(f"  real {b_var}_q, {b_var}_d;")
 
+        # Primary input logic variables (sampled once at I/O boundary)
+        non_logic_pins = set()
+        for p_name, p in self.dag.ports.items():
+            low = p_name.lower()
+            if low in ("vdd", "vss", "sub", "gnd", "avdd", "avss", "dvdd", "dvss"):
+                non_logic_pins.update(p.bit_names)
+        for r in self.dag.registers.values():
+            non_logic_pins.add(r.clock_signal)
+            if r.reset_signal:
+                non_logic_pins.add(r.reset_signal)
+
+        logic_inputs = [p for p in self.dag.primary_inputs if p not in non_logic_pins]
+        if logic_inputs:
+            lines.append("  // Boundary Input Logic Variables")
+            for p in logic_inputs:
+                in_var = p.replace("[", "_").replace("]", "") + "_in"
+                lines.append(f"  real {in_var};")
+
         # Combinational logic nodes (intermediates and non-register outputs)
         declared_vars: Set[str] = set()
         for node_name, node in self.dag.nodes.items():
@@ -192,6 +210,14 @@ class VerilogAEmitter:
         lines.append("    end")
         lines.append("")
 
+        # Boundary Voltage-to-Logic Sampling
+        if logic_inputs:
+            lines.append("    // Boundary Input Logic Conversions (Sampled Once at I/O Boundary)")
+            for p in logic_inputs:
+                in_var = p.replace("[", "_").replace("]", "") + "_in"
+                lines.append(f"    {in_var} = ((V({p}) > V(VDD,VSS)*0.5) ? 1.0 : 0.0);")
+            lines.append("")
+
         # Multi-Level Combinational Logic Evaluation (in topological order)
         lines.append("    // Multi-Level Combinational Logic Evaluations")
         for node_name in self.dag.topo_order:
@@ -248,20 +274,17 @@ class VerilogAEmitter:
         return re.sub(pattern, replacement, target_expr)
 
     def _format_veriloga_expr(self, expr: str) -> str:
-        """Formats gate expressions with 0/1 boundary-converted inputs and _q / _val variables.
+        """Formats gate expressions with clean _in, _q, and _val variables.
 
-        Primary inputs are wrapped with voltage-to-logic conversion at the boundary:
-          V(pin) → ((V(pin) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)
+        Primary inputs reference their boundary-sampled _in variables.
         Internal signals (_q, _val) remain as-is since they are already 0.0/1.0.
         """
-        # 1. Replace primary inputs with boundary-converted V(pin) → 0/1
-        #    Identify supply/ground/clock/reset pins that should NOT be converted
+        # 1. Replace primary inputs with clean _in boundary variables
         non_logic_pins = set()
         for p_name, p in self.dag.ports.items():
             low = p_name.lower()
             if low in ("vdd", "vss", "sub", "gnd", "avdd", "avss", "dvdd", "dvss"):
                 non_logic_pins.update(p.bit_names)
-        # Clock and reset are handled separately via @(cross) events
         for r in self.dag.registers.values():
             non_logic_pins.add(r.clock_signal)
             if r.reset_signal:
@@ -270,7 +293,8 @@ class VerilogAEmitter:
         for p in self.dag.primary_inputs:
             if p in non_logic_pins:
                 continue
-            expr = self._sub_signal(expr, p, f"((V({p}) > V(VDD,VSS)*0.5) ? 1.0 : 0.0)")
+            in_var = p.replace("[", "_").replace("]", "") + "_in"
+            expr = self._sub_signal(expr, p, in_var)
 
         # 2. Replace register references with their sampled state _q
         for r_name, r in self.dag.registers.items():
