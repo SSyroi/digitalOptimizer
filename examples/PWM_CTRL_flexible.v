@@ -27,14 +27,14 @@
 //            Stable static controls (0 for 2'b01, 1 for 2'b10).
 //
 // Power & DFT Controls:
-//   - Normal mode (c_DFT_en_LP=0, c_DFT_en_PWM=0): Active mode (en_LP=0).
-//   - PWM mode (c_DFT_en_PWM=1):
+//   - Normal mode (c_DfT_en_LP=0, c_DfT_en_PWM=0): Active mode (en_LP=0).
+//   - PWM mode (c_DfT_en_PWM=1):
 //            16-cycle period: 2 cycles active (en_LP=0), 14 cycles LP (en_LP=1).
 //            Fast clock (en_lowFreq=0) over the 2 active cycles, slow otherwise.
 //            Auto-zero: controls rise at cnt=15 (one cycle before en_LP falls),
 //                       stay high at cnt=0, drop at cnt=1 (mid-gap), low until cnt=15.
 //            Chopping:  controls swap polarity once per period, at cnt=0 -> 1.
-//   - DFT LP override (c_DFT_en_LP=1):
+//   - DfT LP override (c_DfT_en_LP=1):
 //            Forces en_LP=1 in all regimes, freezing all oc_ctrl outputs.
 // =============================================================================
 
@@ -43,8 +43,8 @@ module PWM_CTRL (
   input wire        VSS,
   input wire        sub,
   input wire        res_n,
-  input wire        c_DFT_en_LP,
-  input wire        c_DFT_en_PWM,
+  input wire        c_DfT_en_LP,
+  input wire        c_DfT_en_PWM,
   input wire [1:0]  c_DfT_oc_dig_VDD,
   output reg        en_LP,
   output reg        oc_select,
@@ -97,9 +97,9 @@ assign is_chop_mode = (eff_oc_mode == 2'b11);
 assign is_pwm_active_window = (cnt < 4'd2);
 
 // PWM auto-zero sample window:
-// When RELAX_PWM_SAMPLE=0 (default): straddles LP falling edge (cnt==15 || cnt==0)
-// When RELAX_PWM_SAMPLE=1 (relaxed): single-cycle pulse aligned to wakeup (cnt==0)
-assign is_pwm_sample_window = RELAX_PWM_SAMPLE ? (cnt == 4'd0) : ((cnt == 4'd15) || (cnt == 4'd0));
+// Controls rise at cnt=15 (one cycle earlier than en_LP falls at cnt=0),
+// stay high at cnt=0, and drop at cnt=1.
+assign is_pwm_sample_window = (cnt == 4'd15) || (cnt == 4'd0);
 
 // -----------------------------------------------------------------------------
 // 4-bit Periodic Counter & Sequential Core
@@ -119,10 +119,8 @@ always @(posedge clk_i or negedge res_n) begin
       pwm_chop <= ~pwm_chop;
     end
 
-    // Startup flag clearing:
-    // When RELAX_STARTUP=0 (default): clears after full counter cycle (cnt == 15)
-    // When RELAX_STARTUP=1 (relaxed): clears after initial 2-cycle sampling (cnt == 1)
-    if (RELAX_STARTUP ? (cnt == 4'd1) : (cnt == 4'd15)) begin
+    // Startup flag clearing after initial startup phase
+    if (cnt == 4'd15) begin
       startup <= 1'b0;
     end
   end
@@ -133,9 +131,9 @@ end
 // -----------------------------------------------------------------------------
 always @(*) begin
   // 1. Low-Power Enable Logic (en_LP)
-  if (c_DFT_en_LP) begin
+  if (c_DfT_en_LP) begin
     en_LP = 1'b1;
-  end else if (c_DFT_en_PWM) begin
+  end else if (c_DfT_en_PWM) begin
     en_LP = !is_pwm_active_window;
   end else begin
     en_LP = 1'b0; // Normal active operation
@@ -144,14 +142,14 @@ always @(*) begin
   // 2. Frequency Control Logic (en_lowFreq)
   // Fast clock (0) during auto-zero sampling or chopping.
   // Slow clock (1) during closed-loop operation.
-  if (c_DFT_en_LP) begin
+  if (c_DfT_en_LP) begin
     en_lowFreq = 1'b0;
-  end else if (c_DFT_en_PWM) begin
+  end else if (c_DfT_en_PWM) begin
     en_lowFreq = !is_pwm_active_window; // Fast only over the LP=0 gap
   end else if (is_chop_mode) begin
     en_lowFreq = 1'b0;
   end else if (is_az_mode) begin
-    if (RELAX_STARTUP ? startup : (startup && (cnt < 4'd2))) begin
+    if (startup && (cnt < 4'd2)) begin
       en_lowFreq = 1'b0; // Fast clock for initial 2 startup pulses (cnt=0,1)
     end else begin
       en_lowFreq = !cnt[0]; // Slow clock (1) at cnt=2, fast (0) at cnt=3, slow (1) at cnt=4...
@@ -162,7 +160,7 @@ always @(*) begin
 
   // 3. Offset Compensation Select (oc_select)
   // Indicates dynamic chopping / offset compensation activity
-  if (c_DFT_en_LP) begin
+  if (c_DfT_en_LP) begin
     oc_select = 1'b0;
   end else if (is_chop_mode || is_az_mode) begin
     oc_select = 1'b1;
@@ -171,14 +169,14 @@ always @(*) begin
   end
 
   // 4. Bandgap & Charge Pump Control Outputs (oc_ctrl_bgr, oc_ctrl_cp)
-  if (c_DFT_en_LP) begin
+  if (c_DfT_en_LP) begin
     // Frozen to initial state in Low Power
     oc_ctrl_bgr = 1'b0;
     oc_ctrl_cp  = 1'b0;
-  end else if (c_DFT_en_PWM && is_az_mode) begin
+  end else if (c_DfT_en_PWM && is_az_mode) begin
     oc_ctrl_bgr = is_pwm_sample_window;
     oc_ctrl_cp  = is_pwm_sample_window;
-  end else if (c_DFT_en_PWM && is_chop_mode) begin
+  end else if (c_DfT_en_PWM && is_chop_mode) begin
     oc_ctrl_bgr = pwm_chop;
     oc_ctrl_cp  = ~pwm_chop;
   end else if (is_chop_mode) begin
@@ -187,36 +185,20 @@ always @(*) begin
     oc_ctrl_cp  = ~chopping_clk;
   end else if (is_az_mode) begin
     // Auto-zero mode:
-    if (RELAX_STARTUP) begin
-      // Relaxed startup: both BGR and CP sample 2 cycles (cnt=0,1)
-      if (startup) begin
-        oc_ctrl_bgr = 1'b1;
-      end else begin
-        oc_ctrl_bgr = cnt[0];
-      end
-
-      if (startup) begin
-        oc_ctrl_cp = 1'b1;
-      end else begin
-        oc_ctrl_cp = cnt[0];
-      end
+    // BGR samples for 1 cycle (cnt=0), drops to 0 at cnt=1
+    if (startup && (cnt == 4'd0)) begin
+      oc_ctrl_bgr = 1'b1;
+    end else if (startup && (cnt == 4'd1)) begin
+      oc_ctrl_bgr = 1'b0;
     end else begin
-      // Strict nominal startup:
-      // BGR is high at cnt=0, low at cnt=1..2, then alternates with cnt[0]
-      if (startup && (cnt == 4'd0)) begin
-        oc_ctrl_bgr = 1'b1;
-      end else if (startup && (cnt == 4'd1)) begin
-        oc_ctrl_bgr = 1'b0;
-      end else begin
-        oc_ctrl_bgr = cnt[0];
-      end
+      oc_ctrl_bgr = cnt[0];
+    end
 
-      // CP samples for 2 cycles during initial startup (cnt=0,1)
-      if (startup && (cnt < 4'd2)) begin
-        oc_ctrl_cp = 1'b1;
-      end else begin
-        oc_ctrl_cp = cnt[0];
-      end
+    // CP samples for 2 cycles (cnt=0,1), drops to 0 at cnt=2 (1 cycle later than BGR)
+    if (startup && (cnt < 4'd2)) begin
+      oc_ctrl_cp = 1'b1;
+    end else begin
+      oc_ctrl_cp = cnt[0];
     end
   end else if (is_static_1) begin
     oc_ctrl_bgr = 1'b1;

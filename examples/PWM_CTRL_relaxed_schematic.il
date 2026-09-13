@@ -41,7 +41,7 @@ procedure( create_PWM_CTRL_schematic(libName cellName)
     y = y + yStep
     ;; Node: cnt[3]_d = MUX2(cnt[3], INV(NAND3(cnt[0], cnt[1], cnt[2])), NAND3(cnt[0], cnt[1], cnt[2]))
     y = y + yStep
-    ;; Node: startup_d = INV(NAND2(startup, NAND2(cnt[0], NOR3(cnt[1], cnt[2], cnt[3]))))
+    ;; Node: startup_d = INV(NAND2(startup, NAND4(cnt[0], cnt[1], cnt[3], cnt[2])))
     y = y + yStep
     ;; Node: chopping_clk_d = INV(chopping_clk)
     y = y + yStep
@@ -61,23 +61,23 @@ procedure( create_PWM_CTRL_schematic(libName cellName)
     y = y + yStep
     ;; Node: is_pwm_active_window = NOR3(cnt[1], cnt[2], cnt[3])
     y = y + yStep
-    ;; Node: is_pwm_sample_window = NOR2(cnt[0], INV(NOR3(cnt[1], cnt[2], cnt[3])))
+    ;; Node: is_pwm_sample_window = MUX2(cnt[0], NOR3(cnt[1], cnt[2], cnt[3]), INV(NAND3(cnt[1], cnt[2], cnt[3])))
     y = y + yStep
-    ;; Node: oc_select = INV(AOI22(INV(c_DFT_en_LP), is_chop_mode, INV(c_DFT_en_LP), is_az_mode))
+    ;; Node: oc_select = INV(AOI22(INV(c_DfT_en_LP), is_chop_mode, INV(c_DfT_en_LP), is_az_mode))
     y = y + yStep
     ;; Node: oc_select_ext = oc_select
     y = y + yStep
-    ;; Node: oc_ctrl_cp = NOR2(c_DFT_en_LP, MUX2(c_DFT_en_PWM, NAND3(NAND4(INV(cnt[0]), is_az_mode, INV(is_chop_mode), INV(startup)), NAND3(INV(is_az_mode), INV(is_chop_mode), INV(is_static_1)), NAND2(chopping_clk, is_chop_mode)), MUX2(is_az_mode, INV(AOI22(INV(is_chop_mode), INV(is_static_1), is_chop_mode, pwm_chop)), INV(is_pwm_sample_window))))
+    ;; Node: oc_ctrl_cp = NOR2(c_DfT_en_LP, MUX2(c_DfT_en_PWM, MUX2(chopping_clk, NOR2(is_chop_mode, MUX2(cnt[0], NAND2(NAND2(INV(is_az_mode), is_static_1), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt[1]), INV(cnt[2]))), INV(cnt[3]))), is_az_mode)), startup)), INV(NOR2(is_az_mode, is_static_1)))), INV(NOR2(is_chop_mode, MUX2(cnt[0], INV(NAND2(NAND2(INV(is_az_mode), is_static_1), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt[1]), INV(cnt[2]))), INV(cnt[3]))), is_az_mode)), startup))), NOR2(is_az_mode, is_static_1))))), MUX2(is_az_mode, INV(AOI22(INV(is_chop_mode), INV(is_static_1), is_chop_mode, pwm_chop)), INV(is_pwm_sample_window))))
     y = y + yStep
     ;; Node: oc_ctrl_cp_ext = oc_ctrl_cp
     y = y + yStep
-    ;; Node: en_LP = INV(AOI21(c_DFT_en_PWM, INV(is_pwm_active_window), c_DFT_en_LP))
+    ;; Node: en_LP = INV(AOI21(c_DfT_en_PWM, INV(is_pwm_active_window), c_DfT_en_LP))
     y = y + yStep
     ;; Node: en_LP_ext = en_LP
     y = y + yStep
-    ;; Node: oc_ctrl_bgr = NOR2(c_DFT_en_LP, MUX2(c_DFT_en_PWM, NAND3(NAND4(INV(cnt[0]), is_az_mode, INV(is_chop_mode), INV(startup)), NAND2(INV(chopping_clk), is_chop_mode), NAND3(INV(is_az_mode), INV(is_chop_mode), INV(is_static_1))), MUX2(is_az_mode, INV(AOI22(INV(is_chop_mode), INV(is_static_1), is_chop_mode, INV(pwm_chop))), INV(is_pwm_sample_window))))
+    ;; Node: oc_ctrl_bgr = NOR2(c_DfT_en_LP, MUX2(c_DfT_en_PWM, MUX2(chopping_clk, INV(NOR2(is_chop_mode, MUX2(cnt[0], INV(NAND2(NAND2(INV(is_az_mode), is_static_1), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt[1]), INV(cnt[2]))), INV(cnt[3]))), is_az_mode)), startup))), NAND2(NAND2(INV(is_az_mode), INV(is_static_1)), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt[1]), INV(cnt[2]))), INV(cnt[3]))), is_az_mode)), startup))))), NOR2(is_chop_mode, MUX2(cnt[0], NAND2(NAND2(INV(is_az_mode), is_static_1), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt[1]), INV(cnt[2]))), INV(cnt[3]))), is_az_mode)), startup)), INV(NAND2(NAND2(INV(is_az_mode), INV(is_static_1)), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(cnt[1]), INV(cnt[2]))), INV(cnt[3]))), is_az_mode)), startup)))))), MUX2(is_az_mode, INV(AOI22(is_chop_mode, INV(pwm_chop), INV(is_chop_mode), INV(is_static_1))), INV(is_pwm_sample_window))))
     y = y + yStep
-    ;; Node: en_lowFreq = NOR2(c_DFT_en_LP, INV(NAND2(NAND2(c_DFT_en_PWM, INV(is_pwm_active_window)), NAND2(INV(NAND2(INV(NAND2(INV(NAND2(INV(c_DFT_en_PWM), INV(cnt[0]))), is_az_mode)), INV(is_chop_mode))), INV(startup)))))
+    ;; Node: en_lowFreq = NOR2(c_DfT_en_LP, MUX2(c_DfT_en_PWM, INV(NOR2(cnt[0], NAND3(NAND4(INV(cnt[1]), INV(cnt[2]), INV(cnt[3]), startup), is_az_mode, INV(is_chop_mode)))), is_pwm_active_window))
     y = y + yStep
 
     ;; Save and Check
