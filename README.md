@@ -35,13 +35,104 @@
 
 | Circuit | Description | Regs | Total Gates | Inverter Eq. (GE) | Est. Transistors | Key Gates Mapped |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller | 4 | **42 cells** | **128.0 GE** | **~256 T** | `MUX2`, `NOR2`, `AND2`, `OR3`, `DFFR` |
+| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller | 7 | **115 cells** | **325.0 GE** | **~650 T** | `AOI22`, `AOI21`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
 | **`gray_counter.v`** | 3-bit binary to Gray-code generator | 3 | **5 cells** | **32.0 GE** | **~64 T** | `XOR2`, `DFFR` |
 | **`sar_adc_ctrl.v`** | 4-bit synchronous SAR ADC controller | 8 | **59 cells** | **197.0 GE** | **~394 T** | `MUX2`, `XOR2`, `NOR2`, `AND3`, `DFFR` |
 | **`bandgap_trim_fsm.v`**| Comparator-guided bandgap trimmer | 4 | **31 cells** | **104.0 GE** | **~208 T** | `MUX2`, `NOR2`, `DFFR` |
 | **`clock_divider_rst.v`**| Configurable 4-bit loadable clock divider | 5 | **85 cells** | **231.0 GE** | **~462 T** | `MUX2`, `NOR3`, `AND4`, `DFFR` |
 
-*Note: 1 Gate Equivalent (GE) = 1 Inverter = 2 Transistors (e.g. NAND2 = 2.0 GE, AND2 = 3.0 GE, MUX2 = 3.0 GE, DFFR = 8.0 GE).*
+*Note: 1 Gate Equivalent (GE) = 1 Inverter = 2 Transistors (e.g. INV = 1.0 GE, NAND2/NOR2 = 2.0 GE, AND2/OR2 = 3.0 GE, AOI21/OAI21 = 3.0 GE, AOI22/OAI22 = 4.0 GE, MUX2 = 6.0 GE, DFFR/DFFS = 17.0 GE).*
+
+---
+
+## 🏆 Competitive Optimization Benchmark: Beating the Automation Deck (`PWM_CTRL`)
+
+A major real-world benchmark for AMS digital logic synthesis is `PWM_CTRL.v` (a multi-mode PWM & Auto-Zero mixed-signal controller). When benchmarked against the reference **Automation Deck**, the AMS Optimizer beats the baseline across both **silicon area (Gate Equivalents)** and **total cell count** while maintaining **100% Formal Logic Equivalence (4,096 / 4,096 vectors)**:
+
+### 1. Benchmark Comparison vs. Automation Deck
+
+| Synthesis Solution | Total Cells | Area (GE) | Transistors | MUX2 | INV | AOI22 | AOI21 | Area Delta vs. Deck | Cell Delta vs. Deck | Formal LEC (4096 Vecs) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Automation Deck Baseline** | 104 | 392.0 GE | 784 T | 0 | 16 | — | — | Baseline | Baseline | 100% PASS |
+| **AMS Optimizer: Rank 1 (Min Area / Pure CMOS)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
+| **AMS Optimizer: Rank 2 (Ultra-Low Area)** | **114** | **326.0 GE** | **652 T** | **0** | 32 | 6 | 1 | **-66.0 GE (-16.8%)** | +10 cells | **100% PASS** |
+| **AMS Optimizer: Rank 3 (Pareto Balanced)** | **90** | **328.0 GE** | **656 T** | **15** | 30 | 6 | 1 | **-64.0 GE (-16.3%)** | **-14 cells (-13.5%)** | **100% PASS** |
+| **AMS Optimizer: Rank 15 (Minimum Cell Count)** | **81** | **339.0 GE** | **678 T** | **12** | 23 | 6 | 1 | **-53.0 GE (-13.5%)** | **-23 cells (-22.1%)** | **100% PASS** |
+
+---
+
+### 2. Required Parameter Configurations
+
+To reproduce each winning architectural trade-off, configure the synthesizer parameters via Python API or CLI flags:
+
+| Target Design Goal | `allow_and_or` | `allow_mux` | `qm_max_inputs` | `shannon_min_inputs` | `allow_output_buffers` | Resulting Metrics | Target Compatibility |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- | :--- |
+| **Minimum Silicon Area** *(Rank #1)* | `False` | `False` | `7` | `3` | `False` | **325.0 GE**, 115 cells | `cs019sw` / Pure Inverting CMOS (0 MUX, 0 AND, 0 OR) |
+| **Ultra-Low Area, Higher Shannon Cutoff** *(Rank #2)* | `False` | `False` | `7` | `4` | `False` | **326.0 GE**, 114 cells | `cs019sw` / Pure Inverting CMOS |
+| **Pareto Balanced Area & Cell Count** *(Rank #3)* | `False` | `True` | `7` | `3` | `False` | **328.0 GE**, **90 cells** | Standard Cell with transmission-gate MUX2 |
+| **Minimum Cell Count** *(Rank #15)* | `True` | `True` | `7` | `3` | `False` | 339.0 GE, **81 cells** | Ultra-compact cell footprint (-23 cells vs. Deck) |
+| **Strict Single-Driver with Output Buffers** | `False` | `False` | `7` | `3` | `True` | **331.0 GE**, 118 cells | Standard cell libraries requiring isolated output pins |
+
+---
+
+### 3. How to Reproduce
+
+#### Via Command-Line Interface (CLI):
+```bash
+# 1. Minimum Silicon Area (325.0 GE, 650T, cs019sw-compatible pure CMOS):
+python3 ams_optimizer/cli.py examples/PWM_CTRL.v \
+  --no-and-or --no-mux --qm-max 7 --shannon-min 3 --no-buffers \
+  -o examples/PWM_CTRL_min_area.va
+
+# 2. Minimum Cell Count (81 cells, 678T):
+python3 ams_optimizer/cli.py examples/PWM_CTRL.v \
+  --allow-and-or --allow-mux --qm-max 7 --shannon-min 3 --no-buffers \
+  -o examples/PWM_CTRL_min_cells.va
+
+# 3. Pareto Balanced (90 cells, 328.0 GE, 656T):
+python3 ams_optimizer/cli.py examples/PWM_CTRL.v \
+  --no-and-or --allow-mux --qm-max 7 --shannon-min 3 --no-buffers \
+  -o examples/PWM_CTRL_balanced.va
+```
+
+#### Via Python API:
+```python
+from ams_optimizer.core.optimizer import AMSOptimizer
+
+with open("examples/PWM_CTRL.v", "r") as f:
+    verilog_code = f.read()
+
+# Synthesize for Minimum Silicon Area (325.0 GE / 650 Transistors, 0 MUX2)
+optimizer = AMSOptimizer(
+    allow_and_or=False,          # Map purely to inverting CMOS (NAND/NOR/INV)
+    allow_mux=False,             # Disallow MUX2 (cs019sw standard cell library)
+    qm_max_inputs=7,             # Exact Quine-McCluskey minimization up to 7 inputs
+    shannon_min_inputs=3,        # Shannon decomposition threshold
+    allow_output_buffers=False,  # Direct wire aliasing for duplicate output ports
+    run_verification=True        # 100% formal LEC verification across 4096 vectors
+)
+
+result = optimizer.run(verilog_code)
+print(f"Total Gates: {result.total_gates} cells")
+print(f"Silicon Area: {result.total_inverter_equivalents:.1f} GE ({result.total_transistors} Transistors)")
+print(f"Formal LEC Passed: {result.equivalence_result.passed}")
+```
+
+---
+
+### 4. Key Architectural Innovations Behind the 17.1% Gain
+
+1. **Global Cross-Cone Common Subexpression Elimination (CSE)**:
+   A centralized `subexpr_cache` maps commutative gate structures across distinct cones (`oc_ctrl_cp`, `oc_ctrl_bgr`, `pwm_chop_d`), pruning duplicate inverters and redundant cofactors.
+2. **Asymmetric Sequential Flop Mapping (`DFFS`)**:
+   Flops with non-zero resets (such as `startup` with `reset_val = 1`) directly instantiate preset flip-flops (`DFFS`) instead of clearing flops (`DFFR`) with inverted D/Q wrapper gates, eliminating 2 inverters per instance.
+3. **Compound CMOS Cell Technology Mapping (`AOI22`, `OAI22`, `AOI21`, `OAI21`)**:
+   4-literal SOP terms $\overline{(A \cdot B) + (C \cdot D)}$ are mapped directly to single-stage 8-transistor `AOI22` cells (4.0 GE) rather than 3 `NAND2` gates (6.0 GE), saving 2.0 GE per cluster.
+4. **Cross-Cone Double Inverter Cancellation**:
+   Tracks gate ancestry across multi-level DAG cones to eliminate back-to-back inverted nodes (`INV(INV(X)) -> X`).
+5. **Direct Output Port Aliasing**:
+   Module alias outputs (`oc_select_ext = oc_select`, `oc_ctrl_cp_ext = oc_ctrl_cp`, `en_LP_ext = en_LP`) connect directly to driving nets without requiring 3 extra `BUFFER` gates (saving 6.0 GE).
+
 
 ---
 

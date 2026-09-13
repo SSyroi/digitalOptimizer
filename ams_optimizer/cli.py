@@ -39,6 +39,14 @@ def main():
     parser.add_argument("--vdd", type=float, default=1.8, help="Supply voltage in Volts (default: 1.8)")
     parser.add_argument("--vth", type=float, default=0.9, help="Logic threshold voltage in Volts (default: 0.9)")
     parser.add_argument("--lib", default="tsmcN65", help="Target Cadence standard cell library name (default: tsmcN65)")
+    parser.add_argument("--allow-and-or", dest="allow_and_or", action="store_true", default=False, help="Allow non-inverting AND/OR cells (default: False for pure CMOS)")
+    parser.add_argument("--no-and-or", dest="allow_and_or", action="store_false", help="Disallow AND/OR cells, mapping strictly to inverting CMOS (NAND/NOR/INV)")
+    parser.add_argument("--allow-mux", dest="allow_mux", action="store_true", default=True, help="Allow MUX2 standard cells (default: True)")
+    parser.add_argument("--no-mux", dest="allow_mux", action="store_false", help="Disallow MUX2 cells (for libraries like cs019sw without pass-transistor MUX)")
+    parser.add_argument("--qm-max", type=int, default=6, help="Max inputs for Quine-McCluskey exact minimization (default: 6)")
+    parser.add_argument("--shannon-min", type=int, default=3, help="Min inputs for Shannon decomposition (default: 3)")
+    parser.add_argument("--allow-buffers", dest="allow_output_buffers", action="store_true", default=True, help="Instantiate BUFFER cells for alias outputs (default: True)")
+    parser.add_argument("--no-buffers", dest="allow_output_buffers", action="store_false", help="Omit BUFFER cells for alias outputs via direct wiring")
 
     args = parser.parse_args()
 
@@ -53,13 +61,19 @@ def main():
     print("AMS Digital Optimizer (Multi-Level DAG Synthesis Engine)")
     print(f"Input RTL: {args.verilog_file}")
     print(f"Voltage: VDD={args.vdd}V, VTH={args.vth}V, Library: {args.lib}")
+    print(f"Options: allow_and_or={args.allow_and_or}, allow_mux={args.allow_mux}, qm_max={args.qm_max}, shannon_min={args.shannon_min}, buffers={args.allow_output_buffers}")
     print("=" * 78)
 
     optimizer = AMSOptimizer(
         supply_voltage=args.vdd,
         threshold_voltage=args.vth,
         skill_lib=args.lib,
-        run_verification=args.verify
+        run_verification=args.verify,
+        allow_and_or=args.allow_and_or,
+        allow_mux=args.allow_mux,
+        qm_max_inputs=args.qm_max,
+        shannon_min_inputs=args.shannon_min,
+        allow_output_buffers=args.allow_output_buffers,
     )
     result = optimizer.run(verilog_code)
 
