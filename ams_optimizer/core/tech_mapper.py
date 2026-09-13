@@ -261,4 +261,78 @@ class TechnologyMapper:
             gates["NAND2"] = gates.get("NAND2", 0) + 1
             expr = f"NAND2({curr}, {inv_p_terms[-1]})"
             
-        return MappedLogicNode(node_name=tt.node_name, expression=expr, gate_counts=gates)
+        std_match = MappedLogicNode(node_name=tt.node_name, expression=expr, gate_counts=gates)
+
+        # Complex gate optimization for 2-term SOPs (AOI22, OAI22, AOI21, OAI21)
+        if len(implicants) == 2:
+            cand = self._map_two_implicants(implicants, inputs)
+            if cand is not None:
+                cand.node_name = tt.node_name
+                if self._calculate_ge_cost(cand) < self._calculate_ge_cost(std_match):
+                    return cand
+
+        return std_match
+
+    def _map_two_implicants(self, implicants: List[str], inputs: List[str]) -> Optional[MappedLogicNode]:
+        """Synthesizes 2-term SOPs into minimal AOI22, OAI22, AOI21, or OAI21 compound cells."""
+        k = len(inputs)
+        t1_lits = [(inputs[b], implicants[0][b] == "1") for b in range(k) if implicants[0][b] != "-"]
+        t2_lits = [(inputs[b], implicants[1][b] == "1") for b in range(k) if implicants[1][b] != "-"]
+
+        len1, len2 = len(t1_lits), len(t2_lits)
+        candidates: List[MappedLogicNode] = []
+
+        def make_lit(name: str, pos: bool, gates: Dict[str, int]) -> str:
+            if pos:
+                return name
+            gates["INV"] = gates.get("INV", 0) + 1
+            return f"INV({name})"
+
+        def make_neg_lit(name: str, pos: bool, gates: Dict[str, int]) -> str:
+            if not pos:
+                return name
+            gates["INV"] = gates.get("INV", 0) + 1
+            return f"INV({name})"
+
+        # Case 1: (2 literals) + (2 literals) -> (L1 & L2) | (L3 & L4)
+        if len1 == 2 and len2 == 2:
+            # Option A: AOI22 with inverted output: INV(AOI22(L1, L2, L3, L4))
+            g_aoi: Dict[str, int] = {"AOI22": 1, "INV": 1}
+            a = make_lit(t1_lits[0][0], t1_lits[0][1], g_aoi)
+            b = make_lit(t1_lits[1][0], t1_lits[1][1], g_aoi)
+            c = make_lit(t2_lits[0][0], t2_lits[0][1], g_aoi)
+            d = make_lit(t2_lits[1][0], t2_lits[1][1], g_aoi)
+            candidates.append(MappedLogicNode("", f"INV(AOI22({a}, {b}, {c}, {d}))", g_aoi))
+
+            # Option B: OAI22: OAI22(~L1, ~L2, ~L3, ~L4)
+            g_oai: Dict[str, int] = {"OAI22": 1}
+            oa = make_neg_lit(t1_lits[0][0], t1_lits[0][1], g_oai)
+            ob = make_neg_lit(t1_lits[1][0], t1_lits[1][1], g_oai)
+            oc = make_neg_lit(t2_lits[0][0], t2_lits[0][1], g_oai)
+            od = make_neg_lit(t2_lits[1][0], t2_lits[1][1], g_oai)
+            candidates.append(MappedLogicNode("", f"OAI22({oa}, {ob}, {oc}, {od})", g_oai))
+
+        # Case 2: (2 literals) + (1 literal) or (1 literal) + (2 literals)
+        elif (len1 == 2 and len2 == 1) or (len1 == 1 and len2 == 2):
+            p2 = t1_lits if len1 == 2 else t2_lits
+            p1 = t2_lits if len1 == 2 else t1_lits
+
+            # Option A: AOI21 with inverted output: INV(AOI21(p2_0, p2_1, p1_0))
+            g_aoi21: Dict[str, int] = {"AOI21": 1, "INV": 1}
+            a = make_lit(p2[0][0], p2[0][1], g_aoi21)
+            b = make_lit(p2[1][0], p2[1][1], g_aoi21)
+            c = make_lit(p1[0][0], p1[0][1], g_aoi21)
+            candidates.append(MappedLogicNode("", f"INV(AOI21({a}, {b}, {c}))", g_aoi21))
+
+            # Option B: OAI21: OAI21(~p2_0, ~p2_1, ~p1_0)
+            g_oai21: Dict[str, int] = {"OAI21": 1}
+            oa = make_neg_lit(p2[0][0], p2[0][1], g_oai21)
+            ob = make_neg_lit(p2[1][0], p2[1][1], g_oai21)
+            oc = make_neg_lit(p1[0][0], p1[0][1], g_oai21)
+            candidates.append(MappedLogicNode("", f"OAI21({oa}, {ob}, {oc})", g_oai21))
+
+        if candidates:
+            candidates.sort(key=self._calculate_ge_cost)
+            return candidates[0]
+        return None
+

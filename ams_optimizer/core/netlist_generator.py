@@ -25,9 +25,15 @@ from .models import (
 class StructuralNetlistGenerator:
     """Constructs the intermediate structural gate netlist from mapped DAG nodes."""
 
-    def __init__(self, dag: SlicedDAG, mapped_nodes: Dict[str, MappedLogicNode]):
+    def __init__(
+        self,
+        dag: SlicedDAG,
+        mapped_nodes: Dict[str, MappedLogicNode],
+        allow_output_buffers: bool = True,
+    ):
         self.dag = dag
         self.mapped_nodes = mapped_nodes
+        self.allow_output_buffers = allow_output_buffers
 
     def _split_args(self, arg_str: str) -> List[str]:
         args = []
@@ -51,21 +57,23 @@ class StructuralNetlistGenerator:
 
     def generate(self) -> StructuralNetlist:
         instances: List[GateInstance] = []
-        inst_idx = 1
+        inst_idx = 0
         subexpr_cache: Dict[str, str] = {}  # canonical_key -> net_name
         net_aliases: Dict[str, str] = {}    # alias -> real_net
+        inv_parent_map: Dict[str, str] = {}
 
-        # 1. Instantiate Sequential Register Flops (DFFS for preset, DFFR for reset)
+        # 1. Instantiate Sequential Elements (Flip-Flops)
         for r_name, reg in self.dag.registers.items():
-            if reg.reset_signal:
-                cell_type = "DFFS" if reg.reset_val != 0 else "DFFR"
-            else:
-                cell_type = "DFF"
-
             for bit_i in range(reg.width):
-                b_name = f"{r_name}[{bit_i}]" if reg.width > 1 else r_name
-                d_net = f"{b_name}_d"
-                q_net = b_name
+                b_name = f"{r_name}_{bit_i}" if reg.width > 1 else r_name
+                d_net = f"{r_name}[{bit_i}]_d" if reg.width > 1 else f"{r_name}_d"
+                q_net = f"{r_name}[{bit_i}]" if reg.width > 1 else r_name
+
+                if reg.reset_signal:
+                    bit_reset = (reg.reset_val >> bit_i) & 1
+                    cell_type = "DFFS" if bit_reset == 1 else "DFFR"
+                else:
+                    cell_type = "DFF"
 
                 pin_conns = {
                     "CLK": reg.clock_signal,
@@ -104,6 +112,9 @@ class StructuralNetlistGenerator:
         def instantiate_expr(expr: str, target_net: Optional[str] = None, level: int = 1) -> str:
             nonlocal inst_idx
             expr = expr.strip()
+            while expr.startswith("INV(INV(") and expr.endswith("))"):
+                expr = expr[8:-2].strip()
+
             gate_match = re.match(r"^([A-Z0-9]+)\((.*)\)$", expr)
             if not gate_match:
                 resolved = get_resolved_net(expr)
@@ -119,6 +130,15 @@ class StructuralNetlistGenerator:
             for arg in raw_args:
                 in_net = instantiate_expr(arg, None, level + 1)
                 resolved_in_nets.append(get_resolved_net(in_net))
+
+            # Cross-cone inverter cancellation: INV(INV(X)) -> X
+            if cell == "INV" and len(resolved_in_nets) == 1:
+                arg_net = resolved_in_nets[0]
+                if arg_net in inv_parent_map:
+                    orig_net = inv_parent_map[arg_net]
+                    if target_net and target_net != orig_net:
+                        net_aliases[target_net] = orig_net
+                    return orig_net
 
             # Build canonical key for CSE deduplication
             if cell in commutative_cells:
@@ -159,6 +179,7 @@ class StructuralNetlistGenerator:
             pin_conns: Dict[str, str] = {}
             if cell == "INV":
                 pin_conns = {"A": resolved_in_nets[0], "Y": out_net}
+                inv_parent_map[out_net] = resolved_in_nets[0]
             elif cell in ("NAND2", "NOR2", "AND2", "OR2", "XOR2", "XNOR2"):
                 pin_conns = {
                     "A": resolved_in_nets[0] if len(resolved_in_nets) > 0 else "1.0",
@@ -236,14 +257,15 @@ class StructuralNetlistGenerator:
                 real_src = get_resolved_net(po)
                 po_driven = any(inst.pin_connections.get("Y") == po for inst in instances)
                 if not po_driven:
-                    instances.append(GateInstance(
-                        instance_name=f"U_BUF_{po.replace('[', '_').replace(']', '')}",
-                        cell_type="BUFFER",
-                        pin_connections={"A": real_src, "Y": po},
-                        level=1,
-                        inverter_equivalent=INVERTER_EQUIVALENTS.get("BUFFER", 2.0),
-                        transistors=TRANSISTOR_COST.get("BUFFER", 4)
-                    ))
+                    if self.allow_output_buffers:
+                        instances.append(GateInstance(
+                            instance_name=f"U_BUF_{po.replace('[', '_').replace(']', '')}",
+                            cell_type="BUFFER",
+                            pin_connections={"A": real_src, "Y": po},
+                            level=1,
+                            inverter_equivalent=INVERTER_EQUIVALENTS.get("BUFFER", 2.0),
+                            transistors=TRANSISTOR_COST.get("BUFFER", 4)
+                        ))
 
         # Calculate totals
         total_gates = len(instances)

@@ -44,6 +44,7 @@ class AMSOptimizer:
         qm_max_inputs: int = 6,
         shannon_min_inputs: int = 3,
         dual_polarity: bool = True,
+        allow_output_buffers: bool = True,
     ):
         self.supply_voltage = supply_voltage
         self.threshold_voltage = threshold_voltage
@@ -54,6 +55,7 @@ class AMSOptimizer:
         self.qm_max_inputs = qm_max_inputs
         self.shannon_min_inputs = shannon_min_inputs
         self.dual_polarity = dual_polarity
+        self.allow_output_buffers = allow_output_buffers
 
     def run(self, verilog_code: str) -> OptimizationResult:
         # Step 1: Multi-Level Slicing (Preserve intermediate conditions)
@@ -67,7 +69,7 @@ class AMSOptimizer:
         for node_name, node in dag.nodes.items():
             local_tables[node_name] = evaluator.evaluate_node(node)
 
-        # Step 3: Technology Mapping (NPN Matching + Shannon MUX + Quine-McCluskey)
+        # Step 3: Map Logic Nodes using Technology Mapper
         mapper = TechnologyMapper(
             allow_and_or=self.allow_and_or,
             allow_mux=self.allow_mux,
@@ -82,7 +84,11 @@ class AMSOptimizer:
                 mapped_nodes[node_name] = mapper.map_truth_table(tt)
 
         # Step 4: Generate Intermediate Structural Gate Netlist
-        netlist_gen = StructuralNetlistGenerator(dag, mapped_nodes)
+        netlist_gen = StructuralNetlistGenerator(
+            dag,
+            mapped_nodes,
+            allow_output_buffers=self.allow_output_buffers,
+        )
         structural_netlist = netlist_gen.generate()
 
         # Step 5: Aggregate Gate Breakdown, Inverter Equivalents & Transistor Cost

@@ -371,5 +371,15 @@ class VerilogAEmitter:
             "    input a, b, c, d; real a, b, c, d;",
             f"    OR4 = ((a > {v_th}) || (b > {v_th}) || (c > {v_th}) || (d > {v_th})) ? {v_hi} : {v_lo};",
             "  endfunction",
+            "",
+            "  analog function real AOI22;",
+            "    input a, b, c, d; real a, b, c, d;",
+            f"    AOI22 = !(((a > {v_th}) && (b > {v_th})) || ((c > {v_th}) && (d > {v_th}))) ? {v_hi} : {v_lo};",
+            "  endfunction",
+            "",
+            "  analog function real OAI22;",
+            "    input a, b, c, d; real a, b, c, d;",
+            f"    OAI22 = !(((a > {v_th}) || (b > {v_th})) && ((c > {v_th}) || (d > {v_th}))) ? {v_hi} : {v_lo};",
+            "  endfunction",
             ""
         ]
