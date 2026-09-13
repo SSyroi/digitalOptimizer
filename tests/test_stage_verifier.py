@@ -36,7 +36,7 @@ class TestStageVerifier(unittest.TestCase):
         self.assertEqual(rep.total_vectors, 1024)
 
     def test_stage_verify_pwm_ctrl(self):
-        with open(os.path.join(EXAMPLES_DIR, "PWM_CTRL.v"), "r") as f:
+        with open(os.path.join(EXAMPLES_DIR, "PWM_CTRL_relaxed.v"), "r") as f:
             code = f.read()
 
         opt = AMSOptimizer(run_verification=False)

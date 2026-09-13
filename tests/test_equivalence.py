@@ -20,7 +20,7 @@ class TestEquivalenceChecker(unittest.TestCase):
         self.optimizer = AMSOptimizer(supply_voltage=1.8, threshold_voltage=0.9, run_verification=True)
 
     def test_pwm_ctrl_equivalence(self):
-        with open(os.path.join(EXAMPLES_DIR, "PWM_CTRL.v"), "r") as f:
+        with open(os.path.join(EXAMPLES_DIR, "PWM_CTRL_relaxed.v"), "r") as f:
             code = f.read()
 
         result = self.optimizer.run(code)

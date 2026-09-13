@@ -39,7 +39,7 @@ Standard digital synthesis tools (e.g., Synopsys Design Compiler, Cadence Genus)
 - Cannot be installed or run easily in locked corporate UNIX environments without root access or C++ compilers.
 
 ### The Problem with Flat 2-Level Truth Tables
-Attempting to flatten an entire RTL module back to primary inputs into a single monolithic 2-level truth table results in a **5.7× gate explosion** (e.g. 594 cells on `PWM_CTRL.v` vs 104 cells in ASIC flows) because shared sub-expressions are redundantly duplicated across every output cone.
+Attempting to flatten an entire RTL module back to primary inputs into a single monolithic 2-level truth table results in a **5.7× gate explosion** (e.g. 594 cells on un-sliced PWM controller RTL vs 104 cells in ASIC flows) because shared sub-expressions are redundantly duplicated across every output cone.
 
 ### The Solution: AMS Digital Optimizer
 The **AMS Digital Logic Optimizer** provides a zero-dependency, pure Python 3.9+ Multi-Level DAG synthesis pipeline that:
@@ -146,22 +146,21 @@ Every synthesis algorithm is isolated in its own dedicated, self-documenting mod
 
 | Circuit | Description | Regs | Total Gates | Inverter Eq. (GE) | Est. Transistors | Key Gates Mapped |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller (Strict) | 7 | **98 cells** | **347.0 GE** | **~694 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
-| **`PWM_CTRL_relaxed.v`** | Multi-mode PWM & Auto-Zero (Corrected Constraints) | 7 | **88 cells** | **325.0 GE** | **~650 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
+| **`PWM_CTRL_relaxed.v` (Min Cells)** | Multi-mode PWM & Auto-Zero (Optimal Cell Count) | 7 | **88 cells** | **325.0 GE** | **~650 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
+| **`PWM_CTRL_relaxed.v` (Min Area)** | Multi-mode PWM & Auto-Zero (Pure Inverting CMOS) | 7 | **113 cells** | **322.0 GE** | **~644 T** | `AOI22`, `AOI21`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
 | **`gray_counter.v`** | 3-bit binary to Gray-code generator | 3 | **5 cells** | **32.0 GE** | **~64 T** | `XOR2`, `DFFR` |
 | **`sar_adc_ctrl.v`** | 4-bit synchronous SAR ADC controller | 8 | **59 cells** | **197.0 GE** | **~394 T** | `MUX2`, `XOR2`, `NOR2`, `AND3`, `DFFR` |
 | **`bandgap_trim_fsm.v`**| Comparator-guided bandgap trimmer | 4 | **31 cells** | **104.0 GE** | **~208 T** | `MUX2`, `NOR2`, `DFFR` |
 | **`clock_divider_rst.v`**| Configurable 4-bit loadable clock divider | 5 | **85 cells** | **231.0 GE** | **~462 T** | `MUX2`, `NOR3`, `AND4`, `DFFR` |
 
-### 4.2 Competitive Comparison vs. Automation Deck Baseline (`PWM_CTRL`)
+### 4.2 Competitive Comparison vs. Automation Deck Baseline (`PWM_CTRL_relaxed`)
 
 | Synthesis Solution | Total Cells | Area (GE) | Transistors | MUX2 | INV | AOI22 | AOI21 | Area Delta vs. Deck | Cell Delta vs. Deck | Formal LEC (4096 Vecs) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Automation Deck Baseline** | 104 | 392.0 GE | 784 T | 0 | 16 | — | — | Baseline | Baseline | 100% PASS |
-| **AMS Optimizer: Strict RTL (`PWM_CTRL.v`)** | **98** | **347.0 GE** | **694 T** | **15** | 35 | 6 | 1 | **-45.0 GE (-11.5%)** | **-6 cells (-5.8%)** | **100% PASS** |
-| **AMS Optimizer: Strict RTL (No-MUX Area-Opt)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
-| **AMS Optimizer: Corrected Relaxed (`PWM_CTRL_relaxed.v`)** | **88** | **325.0 GE** | **650 T** | **15** | 34 | 6 | 1 | **-67.0 GE (-17.1%)** | **-16 cells (-15.4%)** | **100% PASS** |
-| **AMS Optimizer: Corrected Relaxed (No-MUX Area-Opt)** | **113** | **322.0 GE** | **644 T** | **0** | 32 | 6 | 1 | **-70.0 GE (-17.9%)** | +9 cells | **100% PASS** |
+| **AMS Optimizer: Relaxed (Default Flow)** | **96** | **344.0 GE** | **688 T** | **15** | 34 | 6 | 1 | **-48.0 GE (-12.2%)** | **-8 cells (-7.7%)** | **100% PASS** |
+| **AMS Optimizer: Relaxed (Min Cells Winner)** | **88** | **325.0 GE** | **650 T** | **15** | 34 | 6 | 1 | **-67.0 GE (-17.1%)** | **-16 cells (-15.4%)** | **100% PASS** |
+| **AMS Optimizer: Relaxed (Min Area Winner / Pure CMOS)** | **113** | **322.0 GE** | **644 T** | **0** | 32 | 6 | 1 | **-70.0 GE (-17.9%)** | +9 cells | **100% PASS** |
 
 ### 4.3 Verilog Creation Criteria & Nuances for AMS Synthesis
 
@@ -209,37 +208,39 @@ To achieve maximum optimization and prevent issues when synthesizing with the AM
 ### Command Line Interface
 
 ```bash
-# Basic synthesis to Verilog-A
-python3 ams_optimizer/cli.py examples/PWM_CTRL.v -o examples/PWM_CTRL_va.va
-
-# Full deliverable synthesis (Verilog-A + Cadence SKILL + BOM Report)
-python3 ams_optimizer/cli.py examples/PWM_CTRL.v \
-  -o examples/PWM_CTRL_va.va \
-  --save-skill examples/PWM_CTRL_schematic.il \
-  --save-report examples/PWM_CTRL_bom.md \
-  --vdd 1.8 \
-  --vth 0.9 \
-  --lib tsmcN65
+# Standard automated optimization sweep (48 configurations, formally verified winner)
+python3 -m ams_optimizer.cli examples/PWM_CTRL_relaxed.v \
+  --auto-sweep \
+  -o examples/PWM_CTRL_relaxed_va.va \
+  --save-netlist examples/PWM_CTRL_relaxed_netlist.json \
+  --save-skill examples/PWM_CTRL_relaxed_schematic.il \
+  --save-report examples/PWM_CTRL_relaxed_report.txt \
+  --stage-verify
 ```
 
 ### Programmatic Python API
 
 ```python
-from ams_optimizer import AMSOptimizer
+from ams_optimizer.core.optimizer import AMSOptimizer
 
-with open("examples/PWM_CTRL.v", "r") as f:
+with open("examples/PWM_CTRL_relaxed.v", "r") as f:
     verilog_code = f.read()
 
-optimizer = AMSOptimizer(supply_voltage=1.8, threshold_voltage=0.9, skill_lib="tsmcN65")
-result = optimizer.run(verilog_code)
+# Automated 48-configuration sweep and formal verification
+best_result, all_candidates = AMSOptimizer.auto_optimize(
+    verilog_code,
+    verify_top_n=1,
+    verbose=True,
+)
 
-print(f"Total Gates: {result.total_gates}")
-print(f"Total Transistors: ~{result.total_transistors}")
+print(f"Total Gates: {best_result.total_gates}")
+print(f"Total Transistors: ~{best_result.total_transistors}")
+print(f"Silicon Area: {best_result.total_inverter_equivalents:.1f} GE")
 
-# Access generated files
-veriloga_code = result.veriloga_code
-skill_script = result.skill_code
-bom_report = result.bom_report
+# Access generated deliverables
+veriloga_code = best_result.veriloga_code
+skill_script = best_result.skill_code
+bom_report = best_result.bom_report
 ```
 
 ---

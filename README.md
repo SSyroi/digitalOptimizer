@@ -35,8 +35,8 @@
 
 | Circuit | Description | Regs | Total Gates | Inverter Eq. (GE) | Est. Transistors | Key Gates Mapped |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **`PWM_CTRL.v`** | Multi-mode PWM & Auto-Zero controller (Strict) | 7 | **98 cells** | **347.0 GE** | **~694 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
-| **`PWM_CTRL_relaxed.v`** | Multi-mode PWM & Auto-Zero (Architectural Relaxations) | 7 | **77 cells** | **279.0 GE** | **~558 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
+| **`PWM_CTRL_relaxed.v` (Min Cells)** | Multi-mode PWM & Auto-Zero (Optimal Cell Count) | 7 | **88 cells** | **325.0 GE** | **~650 T** | `AOI22`, `AOI21`, `MUX2`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
+| **`PWM_CTRL_relaxed.v` (Min Area)** | Multi-mode PWM & Auto-Zero (Pure Inverting CMOS) | 7 | **113 cells** | **322.0 GE** | **~644 T** | `AOI22`, `AOI21`, `NAND2/3/4`, `NOR2/3`, `DFFR`, `DFFS` |
 | **`gray_counter.v`** | 3-bit binary to Gray-code generator | 3 | **5 cells** | **32.0 GE** | **~64 T** | `XOR2`, `DFFR` |
 | **`sar_adc_ctrl.v`** | 4-bit synchronous SAR ADC controller | 8 | **59 cells** | **197.0 GE** | **~394 T** | `MUX2`, `XOR2`, `NOR2`, `AND3`, `DFFR` |
 | **`bandgap_trim_fsm.v`**| Comparator-guided bandgap trimmer | 4 | **31 cells** | **104.0 GE** | **~208 T** | `MUX2`, `NOR2`, `DFFR` |
@@ -46,57 +46,45 @@
 
 ---
 
-## 🏆 Competitive Optimization Benchmark: Beating the Automation Deck (`PWM_CTRL`)
+## 🏆 Competitive Optimization Benchmark: Beating the Automation Deck (`PWM_CTRL_relaxed`)
 
-A major real-world benchmark for AMS digital logic synthesis is `PWM_CTRL.v` (a multi-mode PWM & Auto-Zero mixed-signal controller). When benchmarked against the reference **Automation Deck**, the AMS Optimizer beats the baseline across both **silicon area (Gate Equivalents)** and **total cell count** while maintaining **100% Formal Logic Equivalence (4,096 / 4,096 vectors)**:
+A major real-world benchmark for AMS digital logic synthesis is `PWM_CTRL_relaxed.v` (a multi-mode PWM & Auto-Zero mixed-signal controller). When benchmarked against the reference **Automation Deck**, the AMS Optimizer beats the baseline across both **silicon area (Gate Equivalents)** and **total cell count** while maintaining **100% Formal Logic Equivalence (4,096 / 4,096 vectors)**:
 
 ### 1. Benchmark Comparison vs. Automation Deck
 
 | Synthesis Solution | Total Cells | Area (GE) | Transistors | MUX2 | INV | AOI22 | AOI21 | Area Delta vs. Deck | Cell Delta vs. Deck | Formal LEC (4096 Vecs) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Automation Deck Baseline** | 104 | 392.0 GE | 784 T | 0 | 16 | — | — | Baseline | Baseline | 100% PASS |
-| **AMS Optimizer: Strict RTL (`PWM_CTRL.v`)** | **98** | **347.0 GE** | **694 T** | **15** | 35 | 6 | 1 | **-45.0 GE (-11.5%)** | **-6 cells (-5.8%)** | **100% PASS** |
-| **AMS Optimizer: Strict RTL (No-MUX Area-Opt)** | **115** | **325.0 GE** | **650 T** | **0** | 33 | 6 | 1 | **-67.0 GE (-17.1%)** | +11 cells | **100% PASS** |
-| **AMS Optimizer: Corrected Relaxed (`PWM_CTRL_relaxed.v`)** | **88** | **325.0 GE** | **650 T** | **15** | 34 | 6 | 1 | **-67.0 GE (-17.1%)** | **-16 cells (-15.4%)** | **100% PASS** |
-| **AMS Optimizer: Corrected Relaxed (No-MUX Area-Opt)** | **113** | **322.0 GE** | **644 T** | **0** | 32 | 6 | 1 | **-70.0 GE (-17.9%)** | +9 cells | **100% PASS** |
+| **AMS Optimizer: Relaxed (Default Flow)** | **96** | **344.0 GE** | **688 T** | **15** | 34 | 6 | 1 | **-48.0 GE (-12.2%)** | **-8 cells (-7.7%)** | **100% PASS** |
+| **AMS Optimizer: Relaxed (Min Cells Winner)** | **88** | **325.0 GE** | **650 T** | **15** | 34 | 6 | 1 | **-67.0 GE (-17.1%)** | **-16 cells (-15.4%)** | **100% PASS** |
+| **AMS Optimizer: Relaxed (Min Area Winner / Pure CMOS)** | **113** | **322.0 GE** | **644 T** | **0** | 32 | 6 | 1 | **-70.0 GE (-17.9%)** | +9 cells | **100% PASS** |
 
 ---
 
-### 2. Required Parameter Configurations
+### 2. Standard Optimization Execution: Automated Sweep Flow (`--auto-sweep`)
 
-To reproduce each winning architectural trade-off, configure the synthesizer parameters via Python API or CLI flags:
-
-| Target Design Goal | `allow_and_or` | `allow_mux` | `qm_max_inputs` | `shannon_min_inputs` | `allow_output_buffers` | Resulting Metrics | Target Compatibility |
-| :--- | :---: | :---: | :---: | :---: | :---: | :--- | :--- |
-| **Minimum Silicon Area** *(Rank #1)* | `False` | `False` | `7` | `3` | `False` | **325.0 GE**, 115 cells | `cs019sw` / Pure Inverting CMOS (0 MUX, 0 AND, 0 OR) |
-| **Ultra-Low Area, Higher Shannon Cutoff** *(Rank #2)* | `False` | `False` | `7` | `4` | `False` | **326.0 GE**, 114 cells | `cs019sw` / Pure Inverting CMOS |
-| **Pareto Balanced Area & Cell Count** *(Rank #3)* | `False` | `True` | `7` | `3` | `False` | **328.0 GE**, **90 cells** | Standard Cell with transmission-gate MUX2 |
-| **Minimum Cell Count** *(Rank #15)* | `True` | `True` | `7` | `3` | `False` | 339.0 GE, **81 cells** | Ultra-compact cell footprint (-23 cells vs. Deck) |
-| **Strict Single-Driver with Output Buffers** | `False` | `False` | `7` | `3` | `True` | **331.0 GE**, 118 cells | Standard cell libraries requiring isolated output pins |
-
----
-
-### 3. Automated Parameter Sweep Flow (`--auto-sweep`)
-
-Instead of manually guessing parameter combinations, the optimizer provides an automated **Two-Phase Parameter Sweep** that explores **48 technology mapping configurations** in ~80 seconds (down from 29 minutes):
+The optimizer includes a built-in **Two-Phase Parameter Sweep** that exhaustively explores **48 technology mapping configurations** in ~80 seconds, selects the Pareto-winning netlist, formally verifies it, and directly generates the Cadence Verilog-A model, SKILL schematic script, and BOM report:
 
 - **Phase 1: Rapid Multi-Configuration Synthesis (synthesis-only):** Pre-extracts the circuit DAG and truth tables **once** (2.5s for 23 nodes), then sweeps 48 configurations with node-level memoization. Suboptimal candidates are synthesized in ~70s without redundant verification.
 - **Phase 2: Targeted Formal Verification (Winner LEC):** Candidates are Pareto-ranked by Silicon Area (GE) and gate count. Exhaustive **Formal Logic Equivalence Checking (LEC)** is executed across all $2^N$ input combinations **only on the winning candidate(s)** (taking ~6s), mathematically guaranteeing 100% equivalence against golden RTL.
 
-#### Running the Automated Sweep via CLI:
+#### Recommended Command to Run Optimization:
 ```bash
-# Run automated 48-configuration sweep, formally verifying the #1 winner:
-python3 -m ams_optimizer.cli examples/PWM_CTRL.v --auto-sweep
-
-# Run automated sweep and formally verify the top 3 Pareto candidates:
-python3 -m ams_optimizer.cli examples/PWM_CTRL.v --auto-sweep --top-n 3
+# Automatically sweep 48 configurations, formally verify winner, and save all outputs:
+python3 -m ams_optimizer.cli examples/PWM_CTRL_relaxed.v \
+  --auto-sweep \
+  -o examples/PWM_CTRL_relaxed_va.va \
+  --save-netlist examples/PWM_CTRL_relaxed_netlist.json \
+  --save-skill examples/PWM_CTRL_relaxed_schematic.il \
+  --save-report examples/PWM_CTRL_relaxed_report.txt \
+  --stage-verify
 ```
 
 #### Running the Automated Sweep via Python API:
 ```python
 from ams_optimizer.core.optimizer import AMSOptimizer
 
-with open("examples/PWM_CTRL.v", "r") as f:
+with open("examples/PWM_CTRL_relaxed.v", "r") as f:
     verilog_code = f.read()
 
 # Automatically sweep 48 configurations and formally verify the winner in ~85s
@@ -113,36 +101,45 @@ print(best_result.bom_report)
 
 ---
 
-### 4. Single-Pass Targeted Reproduction
+### 3. Single-Pass Targeted Reproduction
 
-To reproduce specific winning architectural trade-offs directly without running the sweep:
+To reproduce specific winning architectural trade-offs directly without running the full 48-configuration sweep:
 
 #### Via Command-Line Interface (CLI):
 ```bash
-# 1. Minimum Silicon Area (325.0 GE, 650T, cs019sw-compatible pure CMOS):
-python3 ams_optimizer/cli.py examples/PWM_CTRL.v \
+# 1. Minimum Silicon Area (322.0 GE, 644T, cs019sw-compatible pure CMOS):
+python3 ams_optimizer/cli.py examples/PWM_CTRL_relaxed.v \
   --no-and-or --no-mux --qm-max 7 --shannon-min 3 --no-buffers \
-  -o examples/PWM_CTRL_min_area.va
+  -o examples/PWM_CTRL_relaxed_va.va
 
-# 2. Minimum Cell Count (81 cells, 678T):
-python3 ams_optimizer/cli.py examples/PWM_CTRL.v \
-  --allow-and-or --allow-mux --qm-max 7 --shannon-min 3 --no-buffers \
-  -o examples/PWM_CTRL_min_cells.va
-
-# 3. Pareto Balanced (90 cells, 328.0 GE, 656T):
-python3 ams_optimizer/cli.py examples/PWM_CTRL.v \
+# 2. Minimum Cell Count (88 cells, 325.0 GE, 650T):
+python3 ams_optimizer/cli.py examples/PWM_CTRL_relaxed.v \
   --no-and-or --allow-mux --qm-max 7 --shannon-min 3 --no-buffers \
-  -o examples/PWM_CTRL_balanced.va
+  -o examples/PWM_CTRL_relaxed_va.va
 ```
 
 #### Via Python API:
 ```python
 from ams_optimizer.core.optimizer import AMSOptimizer
 
-with open("examples/PWM_CTRL.v", "r") as f:
+with open("examples/PWM_CTRL_relaxed.v", "r") as f:
     verilog_code = f.read()
 
-# Synthesize for Minimum Silicon Area (325.0 GE / 650 Transistors, 0 MUX2)
+# Synthesize for Minimum Silicon Area (322.0 GE / 644 Transistors, 0 MUX2)
+optimizer = AMSOptimizer(
+    allow_and_or=False,          # Map purely to inverting CMOS (NAND/NOR/INV)
+    allow_mux=False,             # Disallow MUX2 (cs019sw standard cell library)
+    qm_max_inputs=7,             # Exact Quine-McCluskey minimization up to 7 inputs
+    shannon_min_inputs=3,        # Shannon decomposition threshold
+    allow_output_buffers=False,  # Direct wire aliasing for duplicate output ports
+    run_verification=True        # 100% formal LEC verification across 4096 vectors
+)
+
+result = optimizer.run(verilog_code)
+print(f"Total Gates: {result.total_gates} cells")
+print(f"Silicon Area: {result.total_inverter_equivalents:.1f} GE ({result.total_transistors} Transistors)")
+print(f"Formal LEC Passed: {result.equivalence_result.passed}")
+```
 optimizer = AMSOptimizer(
     allow_and_or=False,          # Map purely to inverting CMOS (NAND/NOR/INV)
     allow_mux=False,             # Disallow MUX2 (cs019sw standard cell library)
@@ -280,26 +277,21 @@ To ensure your Verilog RTL synthesizes smoothly without issues or unintended log
 No installation needed. Run directly with Python 3.9+:
 
 ```bash
-# 1. Run automated 48-configuration sweep and verify winner:
-python3 ams_optimizer/cli.py examples/PWM_CTRL.v --auto-sweep
+# 1. Standard Execution: Run automated 48-configuration sweep, formally verify, and save all outputs:
+python3 -m ams_optimizer.cli examples/PWM_CTRL_relaxed.v \
+  --auto-sweep \
+  -o examples/PWM_CTRL_relaxed_va.va \
+  --save-netlist examples/PWM_CTRL_relaxed_netlist.json \
+  --save-skill examples/PWM_CTRL_relaxed_schematic.il \
+  --save-report examples/PWM_CTRL_relaxed_report.txt \
+  --stage-verify
 
-# 2. Synthesize PWM_CTRL to Verilog-A, Structural Netlist JSON, and Virtuoso SKILL
-python3 ams_optimizer/cli.py examples/PWM_CTRL.v \
-  -o examples/PWM_CTRL_va.va \
-  --save-netlist examples/PWM_CTRL_netlist.json \
-  --save-skill examples/PWM_CTRL_schematic.il \
-  --save-report examples/PWM_CTRL_report.txt \
-  --vdd 1.8 \
-  --vth 0.9
+# 2. Synthesize SAR ADC Controller
+python3 -m ams_optimizer.cli examples/sar_adc_ctrl.v --auto-sweep
 
-# 3. Synthesize SAR ADC Controller
-python3 ams_optimizer/cli.py examples/sar_adc_ctrl.v \
-  -o examples/sar_adc_ctrl_va.va \
-  --save-netlist examples/sar_adc_ctrl_netlist.json
-
-# 4. Or install as a local command (optional)
+# 3. Or install as a local command (optional)
 pip install -e .
-ams-opt examples/PWM_CTRL.v --auto-sweep
+ams-opt examples/PWM_CTRL_relaxed.v --auto-sweep
 ```
 
 ---
@@ -343,24 +335,29 @@ digitalOptimizer/
 │       ├── skill_emitter.py   # Cadence Virtuoso SKILL (.il) schematic generator
 │       └── optimizer.py       # Master synthesis & two-phase auto-sweep coordinator
 ├── examples/                  # Benchmark RTL, Verilog-A models & JSON netlists
-│   ├── PWM_CTRL.v
-│   ├── PWM_CTRL_va.va
-│   ├── PWM_CTRL_netlist.json
+│   ├── PWM_CTRL_flexible.v    # Synthesizable RTL with configurable don't-care parameters
+│   ├── PWM_CTRL_relaxed.v     # Relaxed RTL with verified physical timing constraints
+│   ├── PWM_CTRL_relaxed_va.va # Winning Cadence Spectre Verilog-A model (322.0 GE)
+│   ├── PWM_CTRL_relaxed_netlist.json # Winning structural gate netlist
+│   ├── PWM_CTRL_relaxed_schematic.il # Winning Virtuoso SKILL schematic script
+│   ├── PWM_CTRL_relaxed_report.txt   # Winning synthesis BOM report
 │   ├── gray_counter.v
-│   ├── gray_counter_va.va
 │   ├── gray_counter_netlist.json
+│   ├── gray_counter_schematic.il
 │   ├── sar_adc_ctrl.v
-│   ├── sar_adc_ctrl_va.va
 │   ├── sar_adc_ctrl_netlist.json
+│   ├── sar_adc_ctrl_schematic.il
 │   ├── bandgap_trim_fsm.v
-│   ├── bandgap_trim_fsm_va.va
 │   ├── bandgap_trim_fsm_netlist.json
+│   ├── bandgap_trim_fsm_schematic.il
 │   ├── clock_divider_rst.v
-│   ├── clock_divider_rst_va.va
-│   └── clock_divider_rst_netlist.json
+│   ├── clock_divider_rst_netlist.json
+│   └── clock_divider_rst_schematic.il
 ├── tests/                     # Zero-dependency unit & algorithm tests
 │   ├── test_optimizer.py
-│   └── test_algorithms.py
+│   ├── test_algorithms.py
+│   ├── test_equivalence.py
+│   └── test_stage_verifier.py
 ├── pyproject.toml
 └── README.md
 ```

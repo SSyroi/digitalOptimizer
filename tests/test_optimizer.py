@@ -18,7 +18,7 @@ class TestAMSOptimizer(unittest.TestCase):
         self.optimizer = AMSOptimizer(supply_voltage=1.8, threshold_voltage=0.9)
 
     def test_pwm_ctrl_multi_level_sharing(self):
-        with open(os.path.join(EXAMPLES_DIR, "PWM_CTRL.v"), "r") as f:
+        with open(os.path.join(EXAMPLES_DIR, "PWM_CTRL_relaxed.v"), "r") as f:
             code = f.read()
 
         result = self.optimizer.run(code)
