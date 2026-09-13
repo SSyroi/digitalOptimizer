@@ -1,8 +1,9 @@
-"""Standard IEEE RTL Combinational Extractor using pyverilog & iverilog.
+"""Standard IEEE RTL Combinational & Sequential Extractor using pyverilog & iverilog.
 
 Replaces handwritten regex parsers and custom AST interpreters with the industry-standard
-pyverilog AST parser and Icarus Verilog simulation engine to extract exact full-circuit
-truth tables in ~0.07 seconds.
+pyverilog AST parser and Icarus Verilog simulation engine. Dynamically handles both:
+1. Pure combinational circuits (0 Flip-Flops: decoders, ALUs, multiplexer trees, etc.)
+2. Sequential synchronous circuits (N Flip-Flops: FSMs, controllers, counters, etc.)
 """
 
 from __future__ import annotations
@@ -34,24 +35,50 @@ class UnifiedRTLExtractor:
         module = ast.description.definitions[0]
         self.module_name = module.name
 
-        # 2. Extract Primary Inputs
+        # 2. Extract Ports & Signals
+        self.ports: List[Tuple[str, str, int, int, int]] = []
         self.primary_inputs: List[str] = []
+        self.comb_outputs: List[str] = []
+        self.clk_name: str | None = None
+        self.rst_name: str | None = None
+
         for port in module.portlist.ports:
             p = port.first
-            if isinstance(p, Input):
-                name = p.name
-                if name in ("clk", "clk_i", "res_n", "rst", "reset", "VDD", "VSS", "sub"):
+            name = p.name
+            direction = "input" if isinstance(p, Input) else "output"
+            width = 1
+            msb, lsb = 0, 0
+            if p.width:
+                msb = int(p.width.msb.value)
+                lsb = int(p.width.lsb.value)
+                width = abs(msb - lsb) + 1
+            self.ports.append((name, direction, width, msb, lsb))
+
+            if direction == "input":
+                if name in ("clk", "clk_i", "clock"):
+                    self.clk_name = name
                     continue
-                if p.width:
-                    msb = int(p.width.msb.value)
-                    lsb = int(p.width.lsb.value)
+                if name in ("rst", "res_n", "reset", "rst_n"):
+                    self.rst_name = name
+                    continue
+                if name in ("VDD", "VSS", "sub"):
+                    continue
+                if width > 1:
                     step = 1 if msb >= lsb else -1
-                    for b in range(msb, lsb - step, -step):
-                        self.primary_inputs.append(f"{name}[{b}]")
+                    for b_idx in range(msb, lsb - step, -step):
+                        self.primary_inputs.append(f"{name}[{b_idx}]")
                 else:
                     self.primary_inputs.append(name)
+            else:
+                if not name.endswith("_ext"):
+                    if width > 1:
+                        step = 1 if msb >= lsb else -1
+                        for b_idx in range(msb, lsb - step, -step):
+                            self.comb_outputs.append(f"{name}[{b_idx}]")
+                    else:
+                        self.comb_outputs.append(name)
 
-        # 3. Extract Sequential Registers (signals assigned with <=)
+        # 3. Detect Sequential Registers (signals assigned with <=)
         seq_targets = set()
 
         def find_seq(node):
@@ -77,43 +104,21 @@ class UnifiedRTLExtractor:
 
         self.register_bits: List[str] = []
         self.reg_definitions: List[Tuple[str, int]] = []
-        # Maintain consistent ordering: oc_ctrl_bgr, cnt, startup
-        ordered_regs = [r for r in ["oc_ctrl_bgr", "cnt", "startup"] if r in seq_targets]
         for r in seq_targets:
-            if r not in ordered_regs:
-                ordered_regs.append(r)
-
-        for r_name in ordered_regs:
-            w = reg_widths.get(r_name, 1)
-            self.reg_definitions.append((r_name, w))
+            w = reg_widths.get(r, 1)
+            self.reg_definitions.append((r, w))
             if w > 1:
-                for b in range(w - 1, -1, -1):
-                    self.register_bits.append(f"{r_name}[{b}]")
+                for b_idx in range(w - 1, -1, -1):
+                    self.register_bits.append(f"{r}[{b_idx}]")
             else:
-                self.register_bits.append(r_name)
+                self.register_bits.append(r)
+
+        # Remove registered outputs from comb_outputs (driven directly by their DFFs)
+        self.comb_outputs = [o for o in self.comb_outputs if o.split("[")[0] not in seq_targets]
 
         self.inputs = self.primary_inputs + self.register_bits
         self.num_inputs = len(self.inputs)
         self.total_ffs = len(self.register_bits)
-
-        # 4. Extract Primary Outputs
-        self.comb_outputs: List[str] = []
-        for port in module.portlist.ports:
-            p = port.first
-            if isinstance(p, Output):
-                name = p.name
-                if name.endswith("_ext"):
-                    continue
-                if name in seq_targets:
-                    continue  # Registered output is driven by its flip-flop
-                if p.width:
-                    msb = int(p.width.msb.value)
-                    lsb = int(p.width.lsb.value)
-                    step = 1 if msb >= lsb else -1
-                    for b in range(msb, lsb - step, -step):
-                        self.comb_outputs.append(f"{name}[{b}]")
-                else:
-                    self.comb_outputs.append(name)
 
         # Register D-inputs
         self.d_targets = [f"{b}_d" for b in self.register_bits]
@@ -127,71 +132,87 @@ class UnifiedRTLExtractor:
             vvp_path = os.path.join(tmpdir, "extract_tb.vvp")
             out_path = os.path.join(tmpdir, "tb_out.txt")
 
-            tb_code = f"""`timescale 1ns/1ps
-module tb;
-  reg clk;
-  reg res_n;
-  reg c_DfT_en_LP;
-  reg c_DfT_en_PWM;
-  reg [1:0] c_DfT_oc_dig_VDD;
-  reg c_metalFix_invert_oc_defaults;
+            # Dynamically construct testbench matching exact module interface
+            tb_lines = ["`timescale 1ns/1ps", "module tb;"]
 
-  wire en_LP, oc_select, oc_ctrl_cp, oc_ctrl_bgr, en_lowFreq;
-  reg s_en_LP, s_oc_select, s_oc_ctrl_cp, s_en_lowFreq;
+            # Declare signals
+            for name, direction, width, msb, lsb in self.ports:
+                w_str = f"[{msb}:{lsb}] " if width > 1 else ""
+                if direction == "input":
+                    tb_lines.append(f"  reg {w_str}{name};")
+                else:
+                    tb_lines.append(f"  wire {w_str}{name};")
 
-  PWM_CTRL dut (
-    .VDD(1'b1), .VSS(1'b0), .sub(1'b0), .res_n(res_n), .clk_i(clk),
-    .c_DfT_en_LP(c_DfT_en_LP),
-    .c_DfT_en_PWM(c_DfT_en_PWM),
-    .c_DfT_oc_dig_VDD(c_DfT_oc_dig_VDD),
-    .c_metalFix_invert_oc_defaults(c_metalFix_invert_oc_defaults),
-    .en_LP(en_LP),
-    .oc_select(oc_select),
-    .oc_ctrl_cp(oc_ctrl_cp),
-    .oc_ctrl_bgr(oc_ctrl_bgr),
-    .en_lowFreq(en_lowFreq)
-  );
+            # Combinational sample registers
+            for tgt in self.comb_outputs:
+                clean_tgt = tgt.replace("[", "_").replace("]", "")
+                tb_lines.append(f"  reg s_{clean_tgt};")
 
-  integer i;
-  reg [{self.num_inputs-1}:0] vec;
-  integer fd;
+            # Instantiate DUT
+            tb_lines.append(f"\n  {self.module_name} dut (")
+            conn_lines = [f"    .{name}({name})" for name, _, _, _, _ in self.ports]
+            tb_lines.append(",\n".join(conn_lines))
+            tb_lines.append("  );\n")
 
-  initial begin
-    fd = $fopen("{out_path}", "w");
-    clk = 0; res_n = 1;
-    for (i = 0; i < {num_rows}; i = i + 1) begin
-      vec = i[{self.num_inputs-1}:0];
-      c_DfT_en_LP = vec[0];
-      c_DfT_en_PWM = vec[1];
-      c_DfT_oc_dig_VDD[1] = vec[2];
-      c_DfT_oc_dig_VDD[0] = vec[3];
-      c_metalFix_invert_oc_defaults = vec[4];
-      dut.oc_ctrl_bgr = vec[5];
-      dut.cnt[3] = vec[6];
-      dut.cnt[2] = vec[7];
-      dut.cnt[1] = vec[8];
-      dut.cnt[0] = vec[9];
-      dut.startup = vec[10];
-      #1;
-      // Sample combinational outputs before clock pulse
-      s_en_LP = en_LP;
-      s_oc_select = oc_select;
-      s_oc_ctrl_cp = oc_ctrl_cp;
-      s_en_lowFreq = en_lowFreq;
-      // Pulse clock to capture registered next states
-      clk = 1; #1; clk = 0; #1;
-      $fdisplay(fd, "%b%b%b%b%b%b%b%b%b%b",
-        s_en_LP, s_oc_select, s_oc_ctrl_cp, s_en_lowFreq,
-        dut.oc_ctrl_bgr, dut.cnt[3], dut.cnt[2], dut.cnt[1], dut.cnt[0], dut.startup
-      );
-    end
-    $fclose(fd);
-    $finish;
-  end
-endmodule
-"""
+            # Test loop
+            tb_lines.append(f"  integer i;")
+            tb_lines.append(f"  reg [{self.num_inputs-1}:0] vec;")
+            tb_lines.append(f"  integer fd;\n")
+            tb_lines.append("  initial begin")
+            tb_lines.append(f'    fd = $fopen("{out_path}", "w");')
+
+            # Initialize power, clock, reset
+            for name, direction, _, _, _ in self.ports:
+                if direction == "input":
+                    if name in ("clk", "clk_i", "clock"):
+                        tb_lines.append(f"    {name} = 0;")
+                    elif name in ("res_n", "rst_n"):
+                        tb_lines.append(f"    {name} = 1;")
+                    elif name in ("rst", "reset"):
+                        tb_lines.append(f"    {name} = 0;")
+                    elif name == "VDD":
+                        tb_lines.append(f"    VDD = 1'b1;")
+                    elif name in ("VSS", "sub"):
+                        tb_lines.append(f"    {name} = 1'b0;")
+
+            tb_lines.append(f"    for (i = 0; i < {num_rows}; i = i + 1) begin")
+            tb_lines.append(f"      vec = i[{self.num_inputs-1}:0];")
+
+            # Apply vector to inputs
+            for bit_i, inp_name in enumerate(self.inputs):
+                if inp_name in self.primary_inputs:
+                    tb_lines.append(f"      {inp_name} = vec[{bit_i}];")
+                else:
+                    tb_lines.append(f"      dut.{inp_name} = vec[{bit_i}];")
+
+            tb_lines.append("      #1;")
+            # Sample combinational outputs
+            for tgt in self.comb_outputs:
+                clean_tgt = tgt.replace("[", "_").replace("]", "")
+                tb_lines.append(f"      s_{clean_tgt} = {tgt};")
+
+            # If sequential, pulse clock and sample next state
+            if self.total_ffs > 0 and self.clk_name:
+                tb_lines.append(f"      {self.clk_name} = 1; #1; {self.clk_name} = 0; #1;")
+
+            # Format string to display
+            fmt_spec = "%b" * len(self.comb_targets)
+            sample_args = []
+            for tgt in self.comb_outputs:
+                clean_tgt = tgt.replace("[", "_").replace("]", "")
+                sample_args.append(f"s_{clean_tgt}")
+            for reg_bit in self.register_bits:
+                sample_args.append(f"dut.{reg_bit}")
+
+            tb_lines.append(f'      $fdisplay(fd, "{fmt_spec}", {", ".join(sample_args)});')
+            tb_lines.append("    end")
+            tb_lines.append("    $fclose(fd);")
+            tb_lines.append("    $finish;")
+            tb_lines.append("  end")
+            tb_lines.append("endmodule")
+
             with open(tb_path, "w") as f:
-                f.write(tb_code)
+                f.write("\n".join(tb_lines))
 
             # Invoke iverilog compiler and runtime
             subprocess.run(
@@ -214,19 +235,16 @@ endmodule
         for col, tgt in enumerate(self.comb_targets):
             raw_bits = list("".join(line[col] for line in lines))
 
-            # Optional Don't-Care relaxation for startup states
-            if dc_relaxation == "startup_relaxed":
-                # In steady-state operation (startup=0), startup=1 states for cnt > 1 are don't care
+            # Optional Don't-Care relaxation for startup states in stateful designs
+            if dc_relaxation == "startup_relaxed" and "startup" in self.inputs and any("cnt" in inp for inp in self.inputs):
+                startup_idx = self.inputs.index("startup")
+                cnt_indices = [idx for idx, inp in enumerate(self.inputs) if "cnt[" in inp]
                 for row_i in range(num_rows):
-                    startup_val = (row_i >> 10) & 1
-                    cnt_val = (
-                        (((row_i >> 6) & 1) << 3)
-                        | (((row_i >> 7) & 1) << 2)
-                        | (((row_i >> 8) & 1) << 1)
-                        | ((row_i >> 9) & 1)
-                    )
+                    startup_val = (row_i >> startup_idx) & 1
+                    cnt_val = 0
+                    for c_bit, c_idx in enumerate(reversed(cnt_indices)):
+                        cnt_val |= (((row_i >> c_idx) & 1) << c_bit)
                     if startup_val == 1 and cnt_val > 1:
-                        # Don't care '-' for pyeda
                         raw_bits[row_i] = "-"
 
             table_strings[tgt] = "".join(raw_bits)
