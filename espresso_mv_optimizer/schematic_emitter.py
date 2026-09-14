@@ -1,4 +1,22 @@
-# Quick Prototyping Schematic Guide: PWM_CTRL (74-Cell Architecture)
+"""Unified Cadence Virtuoso Schematic Prototyping Guide Emitter.
+
+Generates a copy-paste ready Markdown (.md) guide for rapid schematic capture
+in Cadence Virtuoso using iterated instance arrays (e.g. NAND4<24:1>, NAND2<17:1>)
+and 1-line comma-separated terminal wire labels.
+"""
+
+from __future__ import annotations
+import os
+import re
+import sys
+from typing import Dict, List, Any, Optional
+from collections import defaultdict
+
+
+def generate_schematic_guide_for_pwm_ctrl(output_path: Optional[str] = None) -> str:
+    """Generates the verified 74-cell architecture schematic guide for PWM_CTRL."""
+    
+    md_content = r"""# Quick Prototyping Schematic Guide: PWM_CTRL (74-Cell Architecture)
 
 
 This guide enables a schematic engineer to rapidly build and prototype the **Rank 1 Winning Architecture (319.0 GE, 74 Standard Cells)** in **Cadence Virtuoso Schematic Editor** in under 10 minutes using **iterated instance arrays** (e.g. `NAND4<24:1>`, `NAND2<17:1>`, etc.) and **1-line bus wire labels**.
@@ -313,3 +331,100 @@ Terminal Y: w_c12, w_c14, w_c17, w_c18, w_c21, w_c22, w_c11_lo, w_c15_lo, w_c16_
    - `en_LP`: Active low window during PWM mode for cycles 0 and 1.
 3. **LVS / LEC**:
    - The schematic netlist generated from this guide will have 100% formal equivalence to `examples/PWM_CTRL.v` and `examples/PWM_CTRL.va`.
+"""
+    if output_path:
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        with open(output_path, "w") as f:
+            f.write(md_content)
+    return md_content
+
+
+def generate_schematic_guide_from_netlist(netlist_path: str, output_path: Optional[str] = None) -> str:
+    """Parses any structural Verilog netlist and generates an iterated schematic guide."""
+    if not os.path.exists(netlist_path):
+        raise FileNotFoundError(f"Netlist file not found: {netlist_path}")
+
+    with open(netlist_path, "r") as f:
+        content = f.read()
+
+    # Extract module name
+    mod_match = re.search(r"module\s+(\w+)\s*\((.*?)\);", content, re.DOTALL)
+    module_name = mod_match.group(1) if mod_match else "circuit"
+    port_list = [p.strip() for p in mod_match.group(2).split(",") if p.strip()] if mod_match else []
+
+    # Extract all gate instances
+    inst_pattern = re.compile(r"([A-Za-z0-9_]+)\s+([A-Za-z0-9_]+)\s*\((.*?)\);", re.DOTALL)
+    instances_by_cell = defaultdict(list)
+
+    for match in inst_pattern.finditer(content):
+        cell_type, inst_name, ports_str = match.groups()
+        if cell_type in ("module", "input", "output", "wire", "reg", "assign"):
+            continue
+        # Parse port mappings
+        port_matches = re.findall(r"\.([A-Za-z0-9_]+)\s*\((.*?)\)", ports_str)
+        ports = {p.strip(): n.strip() for p, n in port_matches}
+        instances_by_cell[cell_type].append((inst_name, ports))
+
+    lines = []
+    lines.append(f"# Quick Prototyping Schematic Guide: {module_name}")
+    lines.append("")
+    lines.append(f"Auto-generated from `{netlist_path}`.")
+    lines.append("")
+    lines.append("## 1. Instance Arrays Summary")
+    lines.append("")
+    lines.append("| Cell Type | Instance Array Name | Count | Terminals |")
+    lines.append("| :--- | :--- | :---: | :--- |")
+
+    for cell, insts in sorted(instances_by_cell.items(), key=lambda x: -len(x[1])):
+        count = len(insts)
+        sample_ports = list(insts[0][1].keys()) if insts else []
+        clean_cell = re.sub(r"_X\d+", "", cell)
+        lines.append(f"| **{clean_cell}** | `{clean_cell}<{count}:1>` | {count} | `{', '.join(sample_ports)}` |")
+    lines.append("")
+
+    lines.append("## 2. 1-Line Comma-Separated Wire Labels (Virtuoso Ready)")
+    lines.append("")
+
+    for cell, insts in sorted(instances_by_cell.items(), key=lambda x: -len(x[1])):
+        count = len(insts)
+        clean_cell = re.sub(r"_X\d+", "", cell)
+        sample_ports = list(insts[0][1].keys()) if insts else []
+
+        lines.append(f"### `{clean_cell}<{count}:1>` ({count} instances)")
+        lines.append("```text")
+        # Format for each port: descending (count down to 1)
+        for port in sample_ports:
+            wire_list = [insts[i][1].get(port, "VDD") for i in range(count - 1, -1, -1)]
+            lines.append(f"Terminal {port}:")
+            lines.append(", ".join(wire_list))
+            lines.append("")
+        lines.append("```")
+        lines.append("")
+
+    content_str = "\n".join(lines)
+    if output_path:
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        with open(output_path, "w") as f:
+            f.write(content_str)
+    return content_str
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate Cadence Virtuoso Quick Prototyping Guide (.md)")
+    parser.add_argument("input", nargs="?", default="examples/PWM_CTRL.v", help="Input Verilog RTL or Netlist file")
+    parser.add_argument("-o", "--output", default="QUICK_PROTOTYPING_SCHEMATIC.md", help="Output markdown path")
+    args = parser.parse_args()
+
+    if args.input.endswith("_netlist.v"):
+        print(f"[*] Parsing structural netlist: {args.input}")
+        content = generate_schematic_guide_from_netlist(args.input, args.output)
+    else:
+        print(f"[*] Generating optimal schematic prototyping guide for PWM_CTRL -> {args.output}")
+        content = generate_schematic_guide_for_pwm_ctrl(args.output)
+
+    print(f"[+] Successfully wrote {len(content)} bytes to {args.output}")
+
+
+if __name__ == "__main__":
+    main()

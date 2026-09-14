@@ -13,6 +13,7 @@ import sys
 from espresso_mv_optimizer.sweep import run_sweep
 from espresso_mv_optimizer.veriloga_emitter import UnifiedVerilogAEmitter
 from espresso_mv_optimizer.verilog_emitter import UnifiedVerilogNetlistEmitter
+from espresso_mv_optimizer.schematic_emitter import generate_schematic_guide_for_pwm_ctrl
 
 
 def main():
@@ -39,6 +40,14 @@ def main():
         const="examples/PWM_CTRL_netlist.v",
         help="Emit synthesizable gate-level structural Verilog netlist for Rank 1 design",
     )
+    parser.add_argument(
+        "--emit-schematic-md",
+        metavar="PATH",
+        nargs="?",
+        const="QUICK_PROTOTYPING_SCHEMATIC.md",
+        help="Emit Cadence Virtuoso quick prototyping schematic guide with 1-line terminal labels",
+    )
+
 
     args = parser.parse_args()
 
@@ -86,6 +95,12 @@ def main():
             f.write(v_content)
         print(f"[+] Emitted Gate-Level Structural Verilog: {args.emit_verilog} ({len(v_content)} bytes)")
 
+    # Emit Schematic Prototyping Guide if requested
+    if args.emit_schematic_md:
+        sch_content = generate_schematic_guide_for_pwm_ctrl(args.emit_schematic_md)
+        print(f"[+] Emitted Cadence Virtuoso Prototyping Guide: {args.emit_schematic_md} ({len(sch_content)} bytes)")
+
 
 if __name__ == "__main__":
+
     main()
