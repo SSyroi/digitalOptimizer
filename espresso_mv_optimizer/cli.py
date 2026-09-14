@@ -47,14 +47,25 @@ def main():
         const="examples/PWM_CTRL_quick_proto.md",
         help="Emit Cadence Virtuoso quick prototyping schematic guide with 1-line terminal labels (default: examples/PWM_CTRL_quick_proto.md)",
     )
-
-
+    parser.add_argument(
+        "--emit-all",
+        action="store_true",
+        help="Emit all deliverables (Verilog-A .va, structural netlist .v, and quick proto schematic guide .md) for Rank 1 design",
+    )
 
     args = parser.parse_args()
 
     if not os.path.exists(args.verilog):
         print(f"Error: Input Verilog file not found: {args.verilog}", file=sys.stderr)
         sys.exit(1)
+
+    base_name = os.path.splitext(os.path.basename(args.verilog))[0]
+    out_dir = os.path.dirname(os.path.abspath(args.verilog)) or "examples"
+
+    if args.emit_all:
+        args.emit_va = args.emit_va or os.path.join(out_dir, f"{base_name}.va")
+        args.emit_verilog = args.emit_verilog or os.path.join(out_dir, f"{base_name}_netlist.v")
+        args.emit_schematic_md = args.emit_schematic_md or os.path.join(out_dir, f"{base_name}_quick_proto.md")
 
     # Run the high-impact Pareto sweep
     results = run_sweep(args.verilog)
@@ -98,7 +109,11 @@ def main():
 
     # Emit Schematic Prototyping Guide if requested
     if args.emit_schematic_md:
-        sch_content = generate_schematic_guide_for_pwm_ctrl(args.emit_schematic_md)
+        if args.emit_verilog and os.path.exists(args.emit_verilog):
+            from espresso_mv_optimizer.schematic_emitter import generate_schematic_guide_from_netlist
+            sch_content = generate_schematic_guide_from_netlist(args.emit_verilog, args.emit_schematic_md)
+        else:
+            sch_content = generate_schematic_guide_for_pwm_ctrl(args.emit_schematic_md)
         print(f"[+] Emitted Cadence Virtuoso Prototyping Guide: {args.emit_schematic_md} ({len(sch_content)} bytes)")
 
 

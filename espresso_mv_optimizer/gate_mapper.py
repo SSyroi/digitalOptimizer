@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Dict, List, Set, Tuple, Any
 from pyeda.boolalg.expr import OrOp, AndOp, Variable, Complement, Expression
 
-from ams_optimizer.core.models import INVERTER_EQUIVALENTS, TRANSISTOR_COST
+from .models import INVERTER_EQUIVALENTS, TRANSISTOR_COST
 
 
 class SharedGateMapper:

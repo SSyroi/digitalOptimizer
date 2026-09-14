@@ -49,3 +49,7 @@ Thumbs.db
 parser.out
 parsetab.py
 scratch/
+
+# Keep offline vendor packages and wheels tracked
+!vendor/**
+

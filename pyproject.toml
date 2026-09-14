@@ -3,18 +3,18 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ams-optimizer"
-version = "0.2.0"
-description = "Multi-Level DAG Digital Logic Optimizer & Synthesizer for Custom Analog & Mixed-Signal IC Blocks"
+name = "espresso-mv-optimizer"
+version = "1.0.0"
+description = "Unified Multi-Output Berkeley Espresso-MV Digital Logic Optimizer & Synthesizer for AMS IC Design"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
 
 [project.scripts]
-ams-opt = "ams_optimizer.cli:main"
+espresso-opt = "espresso_mv_optimizer.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["ams_optimizer*"]
+include = ["espresso_mv_optimizer*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

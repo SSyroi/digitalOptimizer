@@ -205,7 +205,7 @@ def print_winner_bom(winner: Dict[str, Any]):
     print(f"{'Cell Type':<15} | {'Count':<8} | {'Unit GE':<8} | {'Subtotal GE':<10}")
     print("-" * 65)
 
-    from ams_optimizer.core.models import INVERTER_EQUIVALENTS
+    from .models import INVERTER_EQUIVALENTS
     for cell, count in sorted(winner["gate_counts"].items(), key=lambda x: -x[1]):
         unit_ge = INVERTER_EQUIVALENTS.get(cell, 3.0)
         sub_ge = count * unit_ge
