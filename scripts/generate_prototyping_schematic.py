@@ -2,14 +2,15 @@
 """Convenience CLI script to generate Cadence Virtuoso Quick Prototyping Guides.
 
 Usage:
-  # Generate guide for default PWM_CTRL:
+  # Generate guide for default PWM_CTRL (saves to examples/PWM_CTRL_quick_proto.md):
   python3 scripts/generate_prototyping_schematic.py
 
   # Generate guide with custom output file:
-  python3 scripts/generate_prototyping_schematic.py -o QUICK_PROTOTYPING_SCHEMATIC.md
+  python3 scripts/generate_prototyping_schematic.py -o examples/PWM_CTRL_quick_proto.md
 
   # Generate guide from an arbitrary structural Verilog netlist:
-  python3 scripts/generate_prototyping_schematic.py examples/PWM_CTRL_netlist.v -o my_schematic_guide.md
+  python3 scripts/generate_prototyping_schematic.py examples/PWM_CTRL_netlist.v -o examples/PWM_CTRL_netlist_quick_proto.md
+
 """
 
 import sys

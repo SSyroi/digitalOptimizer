@@ -44,9 +44,10 @@ def main():
         "--emit-schematic-md",
         metavar="PATH",
         nargs="?",
-        const="QUICK_PROTOTYPING_SCHEMATIC.md",
-        help="Emit Cadence Virtuoso quick prototyping schematic guide with 1-line terminal labels",
+        const="examples/PWM_CTRL_quick_proto.md",
+        help="Emit Cadence Virtuoso quick prototyping schematic guide with 1-line terminal labels (default: examples/PWM_CTRL_quick_proto.md)",
     )
+
 
 
     args = parser.parse_args()

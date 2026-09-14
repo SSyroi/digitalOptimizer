@@ -413,7 +413,8 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Generate Cadence Virtuoso Quick Prototyping Guide (.md)")
     parser.add_argument("input", nargs="?", default="examples/PWM_CTRL.v", help="Input Verilog RTL or Netlist file")
-    parser.add_argument("-o", "--output", default="QUICK_PROTOTYPING_SCHEMATIC.md", help="Output markdown path")
+    parser.add_argument("-o", "--output", default="examples/PWM_CTRL_quick_proto.md", help="Output markdown path (default: examples/PWM_CTRL_quick_proto.md)")
+
     args = parser.parse_args()
 
     if args.input.endswith("_netlist.v"):
