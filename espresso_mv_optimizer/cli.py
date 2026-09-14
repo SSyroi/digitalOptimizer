@@ -48,9 +48,14 @@ def main():
         help="Emit Cadence Virtuoso quick prototyping schematic guide with 1-line terminal labels (default: examples/PWM_CTRL_quick_proto.md)",
     )
     parser.add_argument(
+        "--no-emit",
+        action="store_true",
+        help="Skip emitting deliverable files (run sweep only)",
+    )
+    parser.add_argument(
         "--emit-all",
         action="store_true",
-        help="Emit all deliverables (Verilog-A .va, structural netlist .v, and quick proto schematic guide .md) for Rank 1 design",
+        help="Emit all deliverables (enabled by default; kept for backward compatibility)",
     )
 
     args = parser.parse_args()
@@ -62,7 +67,8 @@ def main():
     base_name = os.path.splitext(os.path.basename(args.verilog))[0]
     out_dir = os.path.dirname(os.path.abspath(args.verilog)) or "examples"
 
-    if args.emit_all:
+    # Emit all deliverables by default unless --no-emit is passed
+    if not args.no_emit:
         args.emit_va = args.emit_va or os.path.join(out_dir, f"{base_name}.va")
         args.emit_verilog = args.emit_verilog or os.path.join(out_dir, f"{base_name}_netlist.v")
         args.emit_schematic_md = args.emit_schematic_md or os.path.join(out_dir, f"{base_name}_quick_proto.md")

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Unified Espresso-MV Optimizer 1-Command Runner
+set -e
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+python3 -m espresso_mv_optimizer.cli "${1:-$DIR/examples/PWM_CTRL.v}" "${@:2}"

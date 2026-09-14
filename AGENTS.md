@@ -1,5 +1,16 @@
 # Project Rules: Digital Optimizer & Synthesis
 
+## 0. Single-Command Execution Rule for AI Agents
+- **Execute Exactly ONE Command**: To optimize any Verilog file, run:
+  ```bash
+  ./optimize <path_to_verilog>
+  # or: python3 -m espresso_mv_optimizer.cli <path_to_verilog>
+  ```
+- **Zero Exploratory Overhead**:
+  - Do NOT run intermediate AST checks, unit tests, `git diff`, `git status`, or file explorations unless specifically asked by the user to debug or edit code.
+  - All Cadence deliverables (`.va`, `_netlist.v`, `_quick_proto.md`) are automatically generated alongside the input file by default.
+- **Output Immediately**: Directly present the mandatory Top 10 Pareto Table and Rank 1 Bill of Materials (BOM) in the response.
+
 ## 1. Always Present the Full Optimization Pareto Table
 Whenever running the logic optimizer, benchmarking, or executing `--auto-sweep`:
 - **MANDATORY**: Always print the **Full Pareto Results Table** containing the top candidate configurations (Rank 1 through 10) directly in the response to the user.

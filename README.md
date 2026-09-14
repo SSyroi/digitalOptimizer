@@ -51,26 +51,26 @@
 
 # PART I: Quickstart & Essential Usage (Compact Reference)
 
-### 1. 1-Minute Quickstart
+### 1. 1-Minute Quickstart (1 Command)
 
-Run an automated 48-configuration Pareto sweep on any Verilog-2001 RTL file:
+Run the full automated 48-configuration Pareto sweep and generate all deliverables (`.va`, `_netlist.v`, `_quick_proto.md`) in a single command:
 ```bash
-python3 -m espresso_mv_optimizer.cli examples/controller.v
+./optimize examples/PWM_CTRL.v
+# or:
+python3 -m espresso_mv_optimizer.cli examples/PWM_CTRL.v
 ```
-*(Runs completely self-contained in < 3 seconds using the local `vendor/` packages).*
+*(Runs completely self-contained in < 3 seconds using the local `vendor/` packages, automatically writing the Cadence Spectre `.va` model, gate netlist `_netlist.v`, and schematic guide `_quick_proto.md`).*
 
 ---
 
-### 2. One-Command Delivery of All Artifacts (`--emit-all`)
+### 2. Automatic Delivery of All Artifacts
 
-To run the optimizer and immediately generate the simulation-ready Cadence Spectre Verilog-A model, the synthesizable structural gate netlist, and the Virtuoso quick prototyping guide:
-```bash
-python3 -m espresso_mv_optimizer.cli examples/controller.v --emit-all
-```
-This simultaneously writes:
-1. `examples/controller.va` — Continuous-transition Verilog-A behavioral view for Spectre.
-2. `examples/controller_netlist.v` — Synthesizable standard cell structural Verilog netlist.
-3. `examples/controller_quick_proto.md` — Copy-paste ready schematic assembly guide with 1-line bus wire labels for Virtuoso.
+Running the optimizer above automatically writes:
+1. `<name>.va` — Continuous-transition Verilog-A behavioral view for Spectre.
+2. `<name>_netlist.v` — Synthesizable standard cell structural Verilog netlist.
+3. `<name>_quick_proto.md` — Copy-paste ready schematic assembly guide with 1-line bus wire labels for Virtuoso.
+
+*(To run the sweep without writing files to disk, pass `--no-emit`).*
 
 ---
 
