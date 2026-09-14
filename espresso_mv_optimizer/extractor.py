@@ -8,6 +8,7 @@ pyverilog AST parser and Icarus Verilog simulation engine. Dynamically handles b
 
 from __future__ import annotations
 import os
+import shutil
 import subprocess
 import tempfile
 from typing import Dict, List, Set, Tuple
@@ -225,14 +226,17 @@ class UnifiedRTLExtractor:
                 f.write("\n".join(tb_lines))
 
             # Invoke iverilog compiler and runtime
+            iverilog_bin = shutil.which("iverilog") or "/opt/homebrew/bin/iverilog"
+            vvp_bin = shutil.which("vvp") or "/opt/homebrew/bin/vvp"
+
             subprocess.run(
-                ["/opt/homebrew/bin/iverilog", "-o", vvp_path, tb_path, self.verilog_path],
+                [iverilog_bin, "-o", vvp_path, tb_path, self.verilog_path],
                 check=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
             subprocess.run(
-                ["/opt/homebrew/bin/vvp", vvp_path],
+                [vvp_bin, vvp_path],
                 check=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,

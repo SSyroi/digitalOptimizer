@@ -70,7 +70,7 @@ assign eff_oc_mode = c_DfT_oc_dig_VDD ^ {2{c_metalFix_invert_oc_defaults}};
 
 assign is_az_mode   = (eff_oc_mode == 2'b00);
 assign is_static_0  = (eff_oc_mode == 2'b01);
-assign is_static_1  = RELAX_STATIC_MODES ? eff_oc_mode[0] : (eff_oc_mode == 2'b10);
+assign is_static_1  = (eff_oc_mode == 2'b10);
 assign is_chop_mode = (eff_oc_mode == 2'b11);
 
 // In PWM mode, first 2 cycles of 16-cycle counter (cnt=0,1) are active (LP=0)
@@ -125,9 +125,11 @@ always @(posedge clk_i or negedge res_n) begin
       end else begin
         oc_ctrl_bgr <= ~cnt[0];
       end
-    end else if (is_static_1) begin
+    end else if (is_static_0) begin
+      // Static Mode A (eff_oc_mode == 2'b01): bgr = 1, cp = 0
       oc_ctrl_bgr <= 1'b1;
     end else begin
+      // Static Mode B (eff_oc_mode == 2'b10): bgr = 0, cp = 1 (opposite of State A)
       oc_ctrl_bgr <= 1'b0;
     end
   end
@@ -157,18 +159,21 @@ always @(*) begin
   end
 
   // 3. Offset Compensation Select (oc_select)
+  // Chopping path (1) for continuous chopping and static modes; Auto-Zero (0) only for AZ.
   if (c_DfT_en_LP) begin
     oc_select = 1'b0;
-  end else if (is_chop_mode || is_az_mode) begin
-    oc_select = 1'b1;
-  end else begin
+  end else if (is_az_mode) begin
     oc_select = 1'b0;
+  end else begin
+    oc_select = 1'b1;
   end
 
   // 4. Charge Pump Control Output (oc_ctrl_cp)
+  // In chopping and static modes A & B, CP is complementary to BGR (~bgr).
+  // In Auto-Zero mode, CP tracks BGR in-phase (with 1-cycle startup stagger).
   if (c_DfT_en_LP) begin
     oc_ctrl_cp = 1'b0;
-  end else if (is_chop_mode) begin
+  end else if (!is_az_mode) begin
     oc_ctrl_cp = ~oc_ctrl_bgr;
   end else if (!RELAX_STARTUP && !c_DfT_en_PWM && is_az_mode && startup && (cnt == 4'd1)) begin
     oc_ctrl_cp = 1'b1;
