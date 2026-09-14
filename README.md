@@ -55,7 +55,7 @@
 
 Run an automated 48-configuration Pareto sweep on any Verilog-2001 RTL file:
 ```bash
-python3 -m espresso_mv_optimizer.cli examples/PWM_CTRL.v
+python3 -m espresso_mv_optimizer.cli examples/controller.v
 ```
 *(Runs completely self-contained in < 3 seconds using the local `vendor/` packages).*
 
@@ -65,12 +65,12 @@ python3 -m espresso_mv_optimizer.cli examples/PWM_CTRL.v
 
 To run the optimizer and immediately generate the simulation-ready Cadence Spectre Verilog-A model, the synthesizable structural gate netlist, and the Virtuoso quick prototyping guide:
 ```bash
-python3 -m espresso_mv_optimizer.cli examples/PWM_CTRL.v --emit-all
+python3 -m espresso_mv_optimizer.cli examples/controller.v --emit-all
 ```
 This simultaneously writes:
-1. `examples/PWM_CTRL.va` — Continuous-transition Verilog-A behavioral view for Spectre.
-2. `examples/PWM_CTRL_netlist.v` — Synthesizable standard cell structural Verilog netlist.
-3. `examples/PWM_CTRL_quick_proto.md` — Copy-paste ready schematic assembly guide with 1-line bus wire labels for Virtuoso.
+1. `examples/controller.va` — Continuous-transition Verilog-A behavioral view for Spectre.
+2. `examples/controller_netlist.v` — Synthesizable standard cell structural Verilog netlist.
+3. `examples/controller_quick_proto.md` — Copy-paste ready schematic assembly guide with 1-line bus wire labels for Virtuoso.
 
 ---
 
@@ -78,12 +78,12 @@ This simultaneously writes:
 
 ```bash
 # Generate specific deliverables individually:
-python3 -m espresso_mv_optimizer.cli examples/PWM_CTRL.v --emit-va examples/PWM_CTRL.va
-python3 -m espresso_mv_optimizer.cli examples/PWM_CTRL.v --emit-verilog examples/PWM_CTRL_netlist.v
-python3 -m espresso_mv_optimizer.cli examples/PWM_CTRL.v --emit-schematic-md examples/PWM_CTRL_quick_proto.md
+python3 -m espresso_mv_optimizer.cli examples/controller.v --emit-va examples/controller.va
+python3 -m espresso_mv_optimizer.cli examples/controller.v --emit-verilog examples/controller_netlist.v
+python3 -m espresso_mv_optimizer.cli examples/controller.v --emit-schematic-md examples/controller_quick_proto.md
 
 # Run on isolated Python without external site-packages:
-python3 -s -m espresso_mv_optimizer.cli examples/PWM_CTRL.v --emit-all
+python3 -s -m espresso_mv_optimizer.cli examples/controller.v --emit-all
 ```
 
 | Flag | Description | Default |
@@ -108,9 +108,9 @@ sequenceDiagram
     participant Virt as Cadence Virtuoso
     participant Spec as Spectre Simulator
 
-    Eng->>Opt: python3 -m espresso_mv_optimizer.cli PWM_CTRL.v --emit-all
-    Opt-->>Eng: Emits PWM_CTRL.va + PWM_CTRL_netlist.v + PWM_CTRL_quick_proto.md
-    Eng->>Virt: Create cell view 'veriloga', paste PWM_CTRL.va
+    Eng->>Opt: python3 -m espresso_mv_optimizer.cli controller.v --emit-all
+    Opt-->>Eng: Emits controller.va + controller_netlist.v + controller_quick_proto.md
+    Eng->>Virt: Create cell view 'veriloga', paste controller.va
     Virt-->>Virt: Automatically generates matching symbol view
     Eng->>Virt: Place symbol in testbench schematic, configure view in Hierarchy Editor (config)
     Virt->>Spec: Launch Transient Simulation in ADE Explorer / Assembler
@@ -118,22 +118,22 @@ sequenceDiagram
 ```
 
 1. **Import Verilog-A View**:
-   - In Virtuoso Library Manager, create a new cell `PWM_CTRL` with view type `veriloga`.
-   - Paste the contents of `examples/PWM_CTRL.va` and save. Virtuoso automatically compiles and creates the `symbol` view.
+   - In Virtuoso Library Manager, create a new cell `controller` with view type `veriloga`.
+   - Paste the contents of `examples/controller.va` and save. Virtuoso automatically compiles and creates the `symbol` view.
 2. **Simulate in Spectre / ADE Explorer**:
-   - Place the `PWM_CTRL` symbol in your analog testbench schematic.
-   - In ADE Explorer / ADE Assembler, open your `config` view and select view `veriloga` for instance `PWM_CTRL`.
+   - Place the `controller` symbol in your analog testbench schematic.
+   - In ADE Explorer / ADE Assembler, open your `config` view and select view `veriloga` for instance `controller`.
    - Run transient simulation. The model transitions continuously with realistic slew rates and dynamic supply-rail swings.
 3. **Physical Schematic Import**:
    - In Virtuoso, navigate to `File -> Import -> Verilog`.
-   - Select `examples/PWM_CTRL_netlist.v` and map the cell references to your foundry standard cell library (e.g., `NAND2_X1` $\rightarrow$ `tsmcN65/NAND2_X1`).
+   - Select `examples/controller_netlist.v` and map the cell references to your foundry standard cell library (e.g., `NAND2_X1` $\rightarrow$ `tsmcN65/NAND2_X1`).
    - Virtuoso will automatically generate the transistor-level schematic hierarchy.
 
 ---
 
 ### 5. Optimization Pareto Table & Standard Cell BOM
 
-When executing on the benchmark multi-mode PWM & Auto-Zero mixed-signal controller ([`examples/PWM_CTRL.v`](examples/PWM_CTRL.v)), the optimizer explores 48 technology mapping architectures across the Pareto frontier in **< 3 seconds**:
+When executing on the benchmark 12-input, 10-target mixed-signal controller ([`examples/controller.v`](examples/controller.v)), the optimizer explores 48 technology mapping architectures across the Pareto frontier in **< 3 seconds**:
 
 ```text
 ===================================================================================================================
@@ -188,7 +188,7 @@ from espresso_mv_optimizer.veriloga_emitter import UnifiedVerilogAEmitter
 from espresso_mv_optimizer.verilog_emitter import UnifiedVerilogNetlistEmitter
 
 # 1. Run automated Pareto sweep
-results = run_sweep("examples/PWM_CTRL.v")
+results = run_sweep("examples/controller.v")
 winner = results[0]
 
 print(f"Winner: {winner['total_ge']} GE, {winner['total_cells']} cells")
@@ -261,7 +261,7 @@ flowchart LR
 ### Check 3: FSM Self-Recovery Bound ($\le 16$ Cycles)
 * **What it verifies**: Proves that even if an illegal, unused state is entered (out of the 128 physical combinations), the digital controller is guaranteed to automatically transition back into the valid nominal operational cycle.
 * **Verification Execution**:
-  - The state transition graph is analyzed for terminal attractors. For `PWM_CTRL`, the nominal operating cycles are periodic counter loops of period 16 and period 32.
+  - The state transition graph is analyzed for terminal attractors. For this benchmark controller, the nominal operating cycles are periodic counter loops of period 16 and period 32.
   - The verifier computes the maximum topological path length (worst-case graph diameter) from any unreachable/unassigned state back to the nominal cycle.
   - Formal result: **The circuit self-recovers to the legal operational loop in $\le 16$ clock cycles** from *any* arbitrary initial state.
 
@@ -270,7 +270,7 @@ flowchart LR
 ### Check 4: Cycle-Accurate Multi-Cycle Simulation
 * **What it verifies**: Dynamic temporal behavior, active-low asynchronous reset recovery, and glitch-free clocking over thousands of consecutive cycles.
 * **Verification Execution ([`tests/test_pwm_registered_lp.py`](tests/test_pwm_registered_lp.py))**:
-  - Instantiates the synthesized structural netlist ([`examples/PWM_CTRL_netlist.v`](examples/PWM_CTRL_netlist.v)) and the golden behavioral RTL ([`examples/PWM_CTRL.v`](examples/PWM_CTRL.v)) in a parallel lockstep testbench.
+  - Instantiates the synthesized structural netlist ([`examples/controller_netlist.v`](examples/controller_netlist.v)) and the golden behavioral RTL ([`examples/controller.v`](examples/controller.v)) in a parallel lockstep testbench.
   - Simulates using Icarus Verilog (`iverilog`), comparing output waveforms on every single clock edge across asynchronous reset assertion, de-assertion, and high-speed mode transitions.
 
 ---
@@ -360,7 +360,7 @@ python3 -c "import pyverilog.dataflow.dataflow_analyzer; help(pyverilog.dataflow
 
 ```mermaid
 flowchart TD
-    RTL["Verilog-2001 RTL Source\n(e.g. examples/PWM_CTRL.v)"] --> Extractor["IEEE-1364 AST Extractor\n(pyverilog + iverilog)"]
+    RTL["Verilog-2001 RTL Source\n(e.g. examples/controller.v)"] --> Extractor["IEEE-1364 AST Extractor\n(pyverilog + iverilog)"]
     
     Extractor --> StateSpace["Formal FSM State-Space &\nDeadlock Verifier\n(state_verifier.py)"]
     Extractor --> TruthTable["Exact Golden Truth-Table Matrix\n(2^K Vectors in < 0.2s)"]
@@ -463,10 +463,10 @@ digitalOptimizer/
 │   ├── install_offline.sh         # Automated user-space offline installer script
 │   └── README.md                  # Vendor setup instructions
 ├── examples/                      # Production IC Blocks & Generated Artifacts
-│   ├── PWM_CTRL.v                 # Golden synthesizable Verilog RTL specification
-│   ├── PWM_CTRL.va                # Winner Cadence Spectre Verilog-A model (319.0 GE)
-│   ├── PWM_CTRL_netlist.v         # Winner structural gate netlist (74 cells)
-│   └── PWM_CTRL_quick_proto.md    # Virtuoso quick prototyping guide
+│   ├── controller.v                 # Golden synthesizable Verilog RTL specification
+│   ├── controller.va                # Winner Cadence Spectre Verilog-A model (319.0 GE)
+│   ├── controller_netlist.v         # Winner structural gate netlist (74 cells)
+│   └── controller_quick_proto.md    # Virtuoso quick prototyping guide
 ├── tests/                         # Test Suite
 │   ├── test_pwm_registered_lp.py  # Cycle-accurate netlist verification test
 │   └── test_state_verifier.py     # Formal FSM state-space & deadlock verification test
@@ -499,7 +499,7 @@ python3 -m unittest discover tests
 The test suite validates:
 1. **Registered Signal Extraction**: Correct partitioning of Flip-Flop next-state D-inputs and combinational outputs.
 2. **Formal Logic Equivalence (LEC)**: Verification of mapped netlists against golden RTL.
-3. **Cycle-Accurate Netlist Simulation**: Exhaustive multi-cycle transient simulation of `examples/PWM_CTRL_netlist.v` against `examples/PWM_CTRL.v` using `iverilog`.
+3. **Cycle-Accurate Netlist Simulation**: Exhaustive multi-cycle transient simulation of `examples/controller_netlist.v` against `examples/controller.v` using `iverilog`.
 4. **FSM Deadlock Audit**: Formal proof of 0 deadlocks and self-recovery in $\le 16$ cycles.
 
 ---

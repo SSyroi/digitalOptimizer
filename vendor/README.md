@@ -25,7 +25,7 @@ This directory contains pre-packaged, offline-installable dependencies for the *
 ### Option 1: Zero-Install (Direct `PYTHONPATH`)
 `espresso_mv_optimizer` automatically looks for `vendor/packages` on startup. If you run:
 ```bash
-python3 -m espresso_mv_optimizer.cli examples/PWM_CTRL.v
+python3 -m espresso_mv_optimizer.cli examples/controller.v
 ```
 It will automatically load the dependencies from `./vendor/packages` without modifying your environment.
 
