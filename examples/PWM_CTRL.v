@@ -159,8 +159,11 @@ always @(*) begin
   end
 
   // 3. Offset Compensation Select (oc_select)
-  // Chopping path (1) for continuous chopping and static modes; Auto-Zero (0) only for AZ.
-  if (c_DfT_en_LP) begin
+  // Always 1 in reset (!res_n).
+  // In operational mode (res_n=1): 0 in LP and Auto-Zero; 1 for all the rest.
+  if (!res_n) begin
+    oc_select = 1'b1;
+  end else if (c_DfT_en_LP) begin
     oc_select = 1'b0;
   end else if (is_az_mode) begin
     oc_select = 1'b0;
