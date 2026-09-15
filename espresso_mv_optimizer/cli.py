@@ -113,6 +113,13 @@ def main():
             f.write(v_content)
         print(f"[+] Emitted Gate-Level Structural Verilog: {args.emit_verilog} ({len(v_content)} bytes)")
 
+        # Mandatory Automated Verification: Golden RTL vs Synthesized Netlist Co-Simulation
+        from espresso_mv_optimizer.netlist_verifier import verify_netlist_vs_rtl
+        verify_res = verify_netlist_vs_rtl(args.verilog, args.emit_verilog)
+        if not verify_res["passed"]:
+            print(f"[!] FATAL: Netlist verification failed! Deliverable does not match golden RTL.", file=sys.stderr)
+            sys.exit(1)
+
     # Emit Schematic Prototyping Guide if requested
     if args.emit_schematic_md:
         if args.emit_verilog and os.path.exists(args.emit_verilog):

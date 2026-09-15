@@ -240,10 +240,10 @@ flowchart LR
 ---
 
 ### Check 1: Formal Logic Equivalence (LEC)
-* **What it verifies**: Mathematically proves that the final technology-mapped CMOS gate netlist is **100% functionally identical** to the original behavioral Verilog RTL.
+* **What it verifies**: Mathematically proves that the final technology-mapped CMOS gate netlist is **100% functionally identical** to the original behavioral Verilog RTL across both operational states and asynchronous reset.
 * **Methodology**:
-  - Evaluates all $2^N$ input combinations across all $N$ circuit variables ($N=12$, consisting of 5 primary inputs + 7 register state bits = $2^{12} = 4,096$ stimulus vectors).
-  - Simultaneously tests all 10 circuit target signals ($4,096 \times 10 = \mathbf{40,960\text{ verification points}}$).
+  - Evaluates all $2^N$ input combinations across all $N$ circuit variables ($N=13$, consisting of active `res_n` + 5 primary mode inputs + 7 register state bits = $2^{13} = 8,192$ stimulus vectors).
+  - Simultaneously tests all 10 circuit target signals ($8,192 \times 10 = \mathbf{81,920\text{ verification points}}$).
   - Validates that every combinational output (`en_LP`, `oc_select`, `oc_ctrl_cp`, `oc_ctrl_bgr`, `en_lowFreq`) and every register next-state input (`cnt[3:0]_d`, `startup_d`, `en_LP_d`, `oc_ctrl_bgr_d`) matches the golden RTL bit-for-bit with **0 discrepancies**.
 
 ---
@@ -267,11 +267,13 @@ flowchart LR
 
 ---
 
-### Check 4: Cycle-Accurate Multi-Cycle Simulation
-* **What it verifies**: Dynamic temporal behavior, active-low asynchronous reset recovery, and glitch-free clocking over thousands of consecutive cycles.
-* **Verification Execution ([`tests/test_pwm_registered_lp.py`](tests/test_pwm_registered_lp.py))**:
-  - Instantiates the synthesized structural netlist ([`examples/controller_netlist.v`](examples/controller_netlist.v)) and the golden behavioral RTL ([`examples/controller.v`](examples/controller.v)) in a parallel lockstep testbench.
-  - Simulates using Icarus Verilog (`iverilog`), comparing output waveforms on every single clock edge across asynchronous reset assertion, de-assertion, and high-speed mode transitions.
+### Check 4: Automated Gate-Level Netlist vs. Golden RTL Co-Simulation Signoff
+* **What it verifies**: Dynamic temporal behavior, active reset pulse defaults (`oc_select == 1'b1`), mid-gap PWM chopping polarity swaps, and glitch-free clocking over 1,000+ consecutive cycles across all 32 configuration modes.
+* **Integrated Delivery Signoff ([`netlist_verifier.py`](espresso_mv_optimizer/netlist_verifier.py))**:
+  - Automatically executed on the winning netlist as the **final mandatory signoff** in 1-command runs (`./optimize` or `--emit-all`).
+  - Instantiates the emitted standard cell netlist (`<name>_netlist.v`) and the golden behavioral RTL (`<name>.v`) in a parallel lockstep testbench using Icarus Verilog (`iverilog`).
+  - Sweeps all 32 operating modes, asserts active reset pulses (`res_n = 0`), and monitors all output pins on every single clock edge.
+  - If any mismatch is ever detected between the netlist and RTL, execution halts immediately and refuses to deliver the unverified netlist.
 
 ---
 
