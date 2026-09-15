@@ -1,10 +1,19 @@
 # Deliverables for Copilot / Linux x86_64 Offline Cluster
 
-This folder contains the pre-compiled binary wheel(s) requested for **`pyeda 0.29.0`** on **Linux x86_64 (CPython 3.9)**.
+This directory contains offline dependencies prepared for semiconductor compute clusters without external internet access or root permissions.
 
 ---
 
-## 1. PyPI Note Regarding PyEDA Linux Wheels
+## Directory Index
+
+1. **Root (`deliver_for_copilot/`)**: Pre-compiled binary wheels for **`pyeda 0.29.0`** (CPython 3.9, Linux x86_64) to resolve Espresso C compilation issues.
+2. **Subfolder ([`yosys/`](./yosys/))**: Complete offline WebAssembly wheelhouse for **`Yosys 0.69`** and **`Berkeley ABC`** (~25.7 MB total, zero-sudo, zero-system-dependencies via YoWASP).
+
+---
+
+## Part 1: PyEDA 0.29.0 Linux x86_64 Wheels
+
+### 1.1 PyPI Note Regarding PyEDA Linux Wheels
 PyPI (**https://pypi.org/project/pyeda/0.29.0/#files**) **does not publish binary wheels for Linux/manylinux** for version 0.29.0 (nor any other PyEDA release). PyPI only hosts Windows binary wheels (`.win_amd64.whl`) and the source distribution tarball (`pyeda-0.29.0.tar.gz`).
 
 To fulfill Copilot's exact request without requiring network access, compilers, or headers on the target UNIX machine:
@@ -12,9 +21,7 @@ To fulfill Copilot's exact request without requiring network access, compilers, 
 - Shared libraries (`exprnode.so`, `espresso.so`, `picosat.so`) are linked strictly against `libc.so.6` with max symbol version `GLIBC_2.14`.
 - Fully compatible with `manylinux2014_x86_64` (glibc 2.17+), `manylinux_2_17_x86_64`, and modern glibc (RHEL 7/8/9, CentOS, Ubuntu, Debian, SLES).
 
----
-
-## 2. Included Files & SHA-256 Checksums
+### 1.2 Included Files & SHA-256 Checksums
 
 | File | Size | SHA-256 Checksum |
 | :--- | :--- | :--- |
@@ -28,22 +35,26 @@ cd deliver_for_copilot
 sha256sum -c SHA256SUMS.txt
 ```
 
----
-
-## 3. How to Install Offline
-
-### Option A: Install pyeda from this folder
+### 1.3 How to Install Offline
 ```bash
 python3 -m pip install --no-index --find-links=deliver_for_copilot pyeda
-```
-
-### Option B: One-command full offline installation
-All dependencies (including this Linux wheel, markupsafe Linux wheel, jinja2, ply, pyverilog) can be installed together:
-```bash
-python3 -m pip install --no-index --find-links=deliver_for_copilot --find-links=vendor/wheels --user pyeda pyverilog ply jinja2 markupsafe
-```
-Or simply run:
-```bash
+# Or full vendor offline suite:
 bash vendor/install_offline.sh
 ```
-*(The wheel is also placed in `vendor/wheels/` so `install_offline.sh` works out of the box without any network access or C compiler!)*
+
+---
+
+## Part 2: Yosys 0.69 & Berkeley ABC (`deliver_for_copilot/yosys/`)
+
+See the dedicated [Yosys README](./yosys/README.md) for full architecture and usage details.
+
+### Quick Offline Install
+```bash
+python3 -m pip install --no-index --find-links=deliver_for_copilot/yosys --user yowasp-yosys
+```
+
+### Quick Verification & Run
+```bash
+yowasp-yosys -V
+yowasp-yosys -p "read_verilog input.v; synth -top top; abc -g AND,OR,NOT; write_verilog output.v"
+```
