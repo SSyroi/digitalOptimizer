@@ -12,7 +12,7 @@ This directory contains pre-packaged, offline-installable dependencies for the *
 
 | Package | Version | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| **`pyeda`** | `0.29.0` | Source tarball | Contains complete Berkeley Espresso C source code |
+| **`pyeda`** | `0.29.0` | Source tarball & Linux wheel | Contains Berkeley Espresso C source code and pre-compiled Linux x86_64 cp39 wheel |
 | **`pyverilog`** | `1.3.0` | Universal tarball | Pure Python IEEE-1364 Verilog AST parser |
 | **`ply`** | `3.11` | Pure Python wheel | Python Lex-Yacc |
 | **`jinja2`** | `3.1.6` | Pure Python wheel | Template engine |
