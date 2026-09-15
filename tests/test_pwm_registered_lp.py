@@ -66,6 +66,10 @@ module tb;
         $display("ERR at cycle %0d: en_LP mismatch! RTL=%b Net=%b", cycle, rtl_en_LP, net_en_LP);
         err_count = err_count + 1;
       end
+      if (rtl_oc_select !== net_oc_select) begin
+        $display("ERR at cycle %0d: oc_select mismatch! RTL=%b Net=%b", cycle, rtl_oc_select, net_oc_select);
+        err_count = err_count + 1;
+      end
       if (rtl_oc_ctrl_bgr !== net_oc_ctrl_bgr) begin
         $display("ERR at cycle %0d: bgr mismatch! RTL=%b Net=%b", cycle, rtl_oc_ctrl_bgr, net_oc_ctrl_bgr);
         err_count = err_count + 1;
@@ -81,13 +85,28 @@ module tb;
     end
   endtask
 
+  task check_reset;
+    input [31:0] mode_idx;
+    begin
+      if (net_oc_select !== 1'b1) begin
+        $display("ERR in mode %0d: net_oc_select is NOT 1 in reset! Net=%b", mode_idx, net_oc_select);
+        err_count = err_count + 1;
+      end
+      if (rtl_oc_select !== net_oc_select) begin
+        $display("ERR in mode %0d: oc_select reset mismatch! RTL=%b Net=%b", mode_idx, rtl_oc_select, net_oc_select);
+        err_count = err_count + 1;
+      end
+    end
+  endtask
+
   integer cyc;
   initial begin
     clk_i = 0; res_n = 0;
     VDD = 1; VSS = 0; sub = 0;
     c_DfT_en_LP = 0; c_DfT_en_PWM = 1;
     c_DfT_oc_dig_VDD = 2'b11; c_metalFix_invert_oc_defaults = 0;
-    #12; res_n = 1;
+    #6; check_reset(1);
+    #6; res_n = 1;
 
     // Mode 1: PWM=1, Chop
     for (cyc = 0; cyc < 48; cyc = cyc + 1) begin
@@ -96,21 +115,21 @@ module tb;
 
     // Mode 2: PWM=1, AZ
     c_DfT_oc_dig_VDD = 2'b00;
-    res_n = 0; #12; res_n = 1;
+    res_n = 0; #6; check_reset(2); #6; res_n = 1;
     for (cyc = 0; cyc < 48; cyc = cyc + 1) begin
       @(posedge clk_i); #1; check_step(cyc);
     end
 
     // Mode 3: PWM=0, Chop
     c_DfT_en_PWM = 0; c_DfT_oc_dig_VDD = 2'b11;
-    res_n = 0; #12; res_n = 1;
+    res_n = 0; #6; check_reset(3); #6; res_n = 1;
     for (cyc = 0; cyc < 48; cyc = cyc + 1) begin
       @(posedge clk_i); #1; check_step(cyc);
     end
 
     // Mode 4: PWM=0, AZ (steady-state)
     c_DfT_oc_dig_VDD = 2'b00;
-    res_n = 0; #12; res_n = 1;
+    res_n = 0; #6; check_reset(4); #6; res_n = 1;
     repeat (16) @(posedge clk_i);
     #1;
     for (cyc = 16; cyc < 48; cyc = cyc + 1) begin

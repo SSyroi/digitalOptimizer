@@ -133,7 +133,7 @@ class UnifiedVerilogAEmitter:
         # 5. Extract Unique Cubes & Build Map
         var_names = []
         for inp in self.input_names:
-            if inp in ("c_DfT_en_LP", "c_DfT_en_PWM", "c_metalFix_invert_oc_defaults"):
+            if inp in ("c_DfT_en_LP", "c_DfT_en_PWM", "c_metalFix_invert_oc_defaults", "res_n", "rst_n", "rst", "reset"):
                 var_names.append(f"{inp}_in")
             elif "c_DfT_oc_dig_VDD[" in inp:
                 bit = inp.split("[")[1].split("]")[0]
@@ -180,11 +180,9 @@ class UnifiedVerilogAEmitter:
             lines.append(f"  real {ident}_q, {ident}_d;")
         lines.append("")
         lines.append("  // Primary Input Logic Variables")
-        lines.append("  real c_DfT_en_LP_in;")
-        lines.append("  real c_DfT_en_PWM_in;")
-        lines.append("  real c_DfT_oc_dig_VDD_1_in;")
-        lines.append("  real c_DfT_oc_dig_VDD_0_in;")
-        lines.append("  real c_metalFix_invert_oc_defaults_in;")
+        for v in var_names:
+            if v.endswith("_in"):
+                lines.append(f"  real {v};")
         lines.append("")
         lines.append("  // Input Polarity Inversion Pool Wires")
         lines.append("  real " + ", ".join(f"w_inv_{v}" for v in var_names) + ";")
@@ -221,11 +219,12 @@ class UnifiedVerilogAEmitter:
         lines.append("    end")
         lines.append("")
         lines.append("    // Primary Input Level Conversions")
-        lines.append("    c_DfT_en_LP_in                   = (V(c_DfT_en_LP) > V(VDD,VSS)*0.5) ? 1.0 : 0.0;")
-        lines.append("    c_DfT_en_PWM_in                  = (V(c_DfT_en_PWM) > V(VDD,VSS)*0.5) ? 1.0 : 0.0;")
-        lines.append("    c_DfT_oc_dig_VDD_1_in            = (V(c_DfT_oc_dig_VDD[1]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0;")
-        lines.append("    c_DfT_oc_dig_VDD_0_in            = (V(c_DfT_oc_dig_VDD[0]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0;")
-        lines.append("    c_metalFix_invert_oc_defaults_in = (V(c_metalFix_invert_oc_defaults) > V(VDD,VSS)*0.5) ? 1.0 : 0.0;")
+        for inp in self.input_names:
+            if "c_DfT_oc_dig_VDD[" in inp:
+                bit = inp.split("[")[1].split("]")[0]
+                lines.append(f"    c_DfT_oc_dig_VDD_{bit}_in            = (V(c_DfT_oc_dig_VDD[{bit}]) > V(VDD,VSS)*0.5) ? 1.0 : 0.0;")
+            elif inp in ("c_DfT_en_LP", "c_DfT_en_PWM", "c_metalFix_invert_oc_defaults", "res_n", "rst_n", "rst", "reset"):
+                lines.append(f"    {inp}_in{' ' * max(1, 33 - len(inp))} = (V({inp}) > V(VDD,VSS)*0.5) ? 1.0 : 0.0;")
         lines.append("")
 
         # 8. Input Inverter Pool Evaluations

@@ -61,6 +61,7 @@ class UnifiedRTLExtractor:
                     continue
                 if name in ("rst", "res_n", "reset", "rst_n"):
                     self.rst_name = name
+                    self.primary_inputs.append(name)
                     continue
                 if name in ("VDD", "VSS", "sub"):
                     continue
@@ -186,36 +187,66 @@ class UnifiedRTLExtractor:
                     elif name in ("VSS", "sub"):
                         tb_lines.append(f"    {name} = 1'b0;")
 
+            # Check if reset is active-low or active-high
+            is_active_low_rst = True
+            rst_idx = None
+            if self.rst_name and self.rst_name in self.inputs:
+                rst_idx = self.inputs.index(self.rst_name)
+                is_active_low_rst = (
+                    self.rst_name.endswith("_n")
+                    or self.rst_name.startswith("rst_n")
+                    or self.rst_name.startswith("res_n")
+                    or self.rst_name == "rst_n"
+                )
+
             tb_lines.append(f"    for (i = 0; i < {num_rows}; i = i + 1) begin")
             tb_lines.append(f"      vec = i[{self.num_inputs-1}:0];")
 
-            # Apply vector to inputs
+            # 1. Apply primary inputs (including reset)
             for bit_i, inp_name in enumerate(self.inputs):
                 if inp_name in self.primary_inputs:
                     tb_lines.append(f"      {inp_name} = vec[{bit_i}];")
-                else:
-                    tb_lines.append(f"      dut.{inp_name} = vec[{bit_i}];")
-
             tb_lines.append("      #1;")
-            # Sample combinational outputs
+
+            # 2. Force cut register states (Q inputs to combinational cloud)
+            for bit_i, inp_name in enumerate(self.inputs):
+                if inp_name not in self.primary_inputs:
+                    tb_lines.append(f"      dut.{inp_name} = vec[{bit_i}];")
+            tb_lines.append("      #1;")
+
+            # 3. Sample combinational outputs
             for tgt in self.comb_outputs:
                 clean_tgt = tgt.replace("[", "_").replace("]", "")
                 tb_lines.append(f"      s_{clean_tgt} = {tgt};")
 
-            # If sequential, pulse clock and sample next state
-            if self.total_ffs > 0 and self.clk_name:
-                tb_lines.append(f"      {self.clk_name} = 1; #1; {self.clk_name} = 0; #1;")
+            # 4. Sample D-targets (or mark as '-' don't care if asynchronous reset is active)
+            comb_fmt = "%b" * len(self.comb_outputs)
+            comb_args = [f"s_{tgt.replace('[', '_').replace(']', '')}" for tgt in self.comb_outputs]
+            d_fmt = "%b" * len(self.d_targets)
+            d_args = [f"dut.{b}" for b in self.register_bits]
 
-            # Format string to display
-            fmt_spec = "%b" * len(self.comb_targets)
-            sample_args = []
-            for tgt in self.comb_outputs:
-                clean_tgt = tgt.replace("[", "_").replace("]", "")
-                sample_args.append(f"s_{clean_tgt}")
-            for reg_bit in self.register_bits:
-                sample_args.append(f"dut.{reg_bit}")
-
-            tb_lines.append(f'      $fdisplay(fd, "{fmt_spec}", {", ".join(sample_args)});')
+            if self.total_ffs > 0:
+                d_dash = "-" * len(self.d_targets)
+                if rst_idx is not None:
+                    rst_active_cond = f"vec[{rst_idx}] == 1'b0" if is_active_low_rst else f"vec[{rst_idx}] == 1'b1"
+                    tb_lines.append(f"      if ({rst_active_cond}) begin")
+                    if comb_args:
+                        tb_lines.append(f'        $fdisplay(fd, "{comb_fmt}{d_dash}", {", ".join(comb_args)});')
+                    else:
+                        tb_lines.append(f'        $fdisplay(fd, "{d_dash}");')
+                    tb_lines.append("      end else begin")
+                    if self.clk_name:
+                        tb_lines.append(f"        {self.clk_name} = 1; #1; {self.clk_name} = 0; #1;")
+                    all_sample_args = comb_args + d_args
+                    tb_lines.append(f'        $fdisplay(fd, "{comb_fmt}{d_fmt}", {", ".join(all_sample_args)});')
+                    tb_lines.append("      end")
+                else:
+                    if self.clk_name:
+                        tb_lines.append(f"      {self.clk_name} = 1; #1; {self.clk_name} = 0; #1;")
+                    all_sample_args = comb_args + d_args
+                    tb_lines.append(f'      $fdisplay(fd, "{comb_fmt}{d_fmt}", {", ".join(all_sample_args)});')
+            else:
+                tb_lines.append(f'      $fdisplay(fd, "{comb_fmt}", {", ".join(comb_args)});')
             tb_lines.append("    end")
             tb_lines.append("    $fclose(fd);")
             tb_lines.append("    $finish;")
@@ -252,9 +283,9 @@ class UnifiedRTLExtractor:
             # Optional Don't-Care relaxation for startup states in stateful designs
             # CRITICAL: Never relax next-state D-targets (self.d_targets), so state transitions
             # (such as startup clearing at cnt==15 and steady-state counter/BGR next-states)
-            # are preserved with 100% formal accuracy. Also protect en_lowFreq and oc_ctrl_cp
-            # so that the 2-cycle fast clock window and 1-cycle CP-longer-than-BGR timing are preserved.
-            if dc_relaxation == "startup_relaxed" and tgt not in self.d_targets and tgt not in ("en_lowFreq", "oc_ctrl_cp") and "startup" in self.inputs and any("cnt" in inp for inp in self.inputs):
+            # are preserved with 100% formal accuracy. Also protect oc_select, en_lowFreq and oc_ctrl_cp
+            # so that reset defaults, the 2-cycle fast clock window and 1-cycle CP-longer-than-BGR timing are preserved.
+            if dc_relaxation == "startup_relaxed" and tgt not in self.d_targets and tgt not in ("oc_select", "en_lowFreq", "oc_ctrl_cp") and "startup" in self.inputs and any("cnt" in inp for inp in self.inputs):
                 startup_idx = self.inputs.index("startup")
                 cnt_indices = [idx for idx, inp in enumerate(self.inputs) if "cnt[" in inp]
                 for row_i in range(num_rows):

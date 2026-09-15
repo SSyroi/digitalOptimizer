@@ -48,13 +48,31 @@ class StateSpaceVerifier:
         max_transient = 0
         cycle_lengths: Set[int] = set()
 
+        rst_idx = None
+        is_active_low_rst = True
+        if self.extractor.rst_name and self.extractor.rst_name in self.extractor.primary_inputs:
+            rst_idx = self.extractor.primary_inputs.index(self.extractor.rst_name)
+            is_active_low_rst = (
+                self.extractor.rst_name.endswith("_n")
+                or self.extractor.rst_name.startswith("rst_n")
+                or self.extractor.rst_name.startswith("res_n")
+                or self.extractor.rst_name == "rst_n"
+            )
+
         for pi in range(max_modes):
+            # Operational state transitions are verified for non-reset operational modes
+            if rst_idx is not None:
+                is_rst_active = ((pi >> rst_idx) & 1 == 0) if is_active_low_rst else ((pi >> rst_idx) & 1 == 1)
+                if is_rst_active:
+                    continue
+
             next_state = [0] * self.num_states
             for st in range(self.num_states):
                 row_i = pi | (st << M)
                 nxt_st = 0
                 for bit_i, d_tgt in enumerate(d_targets):
-                    nxt_bit = int(table_strings[d_tgt][row_i])
+                    nxt_char = table_strings[d_tgt][row_i]
+                    nxt_bit = 0 if nxt_char == "-" else int(nxt_char)
                     nxt_st |= (nxt_bit << bit_i)
                 next_state[st] = nxt_st
                 if nxt_st == st:

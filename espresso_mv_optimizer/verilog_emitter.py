@@ -71,7 +71,7 @@ class UnifiedVerilogNetlistEmitter:
                 ident = f"c_DfT_oc_dig_VDD_{bit}"
                 var_names.append(inp)
                 var_ident_map[inp] = ident
-            elif inp in ("c_DfT_en_LP", "c_DfT_en_PWM", "c_metalFix_invert_oc_defaults"):
+            elif inp in ("c_DfT_en_LP", "c_DfT_en_PWM", "c_metalFix_invert_oc_defaults", "res_n", "rst_n", "rst", "reset"):
                 var_names.append(inp)
                 var_ident_map[inp] = inp
             elif "cnt[" in inp:
