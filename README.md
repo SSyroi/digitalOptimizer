@@ -23,6 +23,7 @@
   - [4. Cadence Virtuoso & Spectre Simulation Flow](#4-cadence-virtuoso--spectre-simulation-flow)
   - [5. Optimization Pareto Table & Standard Cell BOM](#5-optimization-pareto-table--standard-cell-bom)
   - [6. Python Programmatic API](#6-python-programmatic-api)
+  - [7. Verilog Authoring Guidelines & "Never-Break" Rules](#7-verilog-authoring-guidelines--the-5-point-never-break-rules)
 - [PART II: Rigorous Silicon Checks & Verification (LEC, Dead States, Self-Recovery)](#part-ii-rigorous-silicon-checks--verification-lec-dead-states-self-recovery)
   - [Check 1: Formal Logic Equivalence (LEC)](#check-1-formal-logic-equivalence-lec)
   - [Check 2: Elimination of All Dead States (0 Deadlocks)](#check-2-elimination-of-all-dead-states-0-deadlocks)
@@ -218,6 +219,51 @@ v_netlist = UnifiedVerilogNetlistEmitter(
     total_cells=winner["total_cells"],
 ).emit()
 ```
+
+---
+
+### 7. Verilog Authoring Guidelines & The 5-Point "Never-Break" Rules
+
+This flow is purpose-built as an **AMS Digital Macrocell Optimizer** (specialized for digital controllers, FSMs, PWM generators, offset compensation sequencers, decoders, and calibration logic in mixed-signal ICs). To ensure seamless parsing, optimization, and gate-level signoff, adhere to the following conventions:
+
+#### 1. Input Space Scale Boundary ($N \le 16\text{ to }18\text{ bits}$)
+The front-end extracts exact boolean behavior by simulating all $2^N$ permutations, where:
+$$N = (\text{Primary Inputs}) + (\text{Sequential Register Bits})$$
+* **Up to 14 bits** ($2^{14} = 16,384$ rows, e.g. `PWM_CTRL` with 13 bits): **Instant (<0.3s)**.
+* **15 to 17 bits** ($2^{17} = 131,072$ rows): **Fast (1 to 4s)**.
+* **$\ge 20$ bits**: Exponential truth-table explosion ($>1,000,000$ rows).
+* **Scope**: Designed for control FSMs, sequencers, and digital macrocells. Passing large 32-bit or 64-bit arithmetic datapaths (e.g. 32-bit adders/multipliers) is outside the truth-table domain.
+
+#### 2. Verilog Language Dialect: Verilog-2001 (Not SystemVerilog)
+* **Parser**: Uses `pyverilog.vparser` (standard IEEE 1364-2001 Verilog).
+* **Supported**: `module`, `input`, `output`, `wire`, `reg`, `parameter`, `always @(*)`, `always @(posedge clk ...)`, `assign`, `case`, `if/else`.
+* **Unsupported**: SystemVerilog keywords (`logic`, `always_ff`, `always_comb`, `enum`, `interface`, `typedef`, `struct`). Use standard `reg` and `wire`.
+
+#### 3. Clocking & Reset Conventions
+* **Clock Pin**: Must be named `clk`, `clk_i`, or `clock` (single synchronous clock domain).
+* **Reset Pin**: Must be named `res_n`, `rst_n` (active-low) or `rst`, `reset` (active-high).
+* **No `#` Delays**: Do not include `#delays` inside synthesizable modules (delays belong in simulation testbenches only).
+
+#### 4. Sequential vs. Combinational Assignments
+* **Sequential Registers**: Must be assigned with non-blocking `<=` inside `always @(posedge clk or ...)` blocks.
+* **Combinational Signals**: Must be assigned with blocking `=` inside `always @(*)` blocks or continuous `assign` statements.
+
+#### 5. Silicon Standard Cell Mapping Constraints
+* **No Memory Arrays**: `reg [7:0] ram [0:255]` is not supported (standard cell libraries map discrete flip-flops, not SRAM compiler blocks).
+* **No Tri-State Inouts**: Avoid `inout` pins or `1'bz` assignments (CMOS standard cell libraries avoid high-Z buses).
+* **Single Module**: Keep the target controller macrocell in a single self-contained top-level module.
+
+---
+
+#### 📋 The 5-Point "Never-Break" Checklist
+
+| # | Rule | Correct Example | Prohibited |
+| :---: | :--- | :--- | :--- |
+| **1** | **Verilog-2001 syntax only** | `input wire a; reg b;` | SystemVerilog `logic a;` |
+| **2** | **Standard clock & reset names** | `clk_i`, `clk`, `res_n`, `rst_n` | Arbitrary custom names like `phi1`, `my_pulse` |
+| **3** | **Total input complexity $\le 16$ bits** | 6 primary inputs + 7 FFs = 13 bits | 32-bit datapath registers ($2^{32}$ vectors) |
+| **4** | **Assignment separation** | `<=` for FFs, `=` / `assign` for comb | Blocking `=` inside clocked `always` blocks |
+| **5** | **Zero simulation delays in RTL** | Clean synthesizable logic | `#10 q <= d;` inside module |
 
 ---
 
